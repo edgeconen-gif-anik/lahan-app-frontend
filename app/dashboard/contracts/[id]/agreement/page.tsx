@@ -41,7 +41,7 @@ export default function AgreementPage() {
           </p>
 
           <p>
-            Project: <strong>{contract.project.name}</strong>
+            Project: <strong>{contract.project?.name ?? "N/A"}</strong>
           </p>
 
           <p>

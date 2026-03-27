@@ -11,7 +11,7 @@ const BACKEND_URL =
 const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-const providers = [
+const providers: NextAuthOptions["providers"] = [
   CredentialsProvider({
     name: "Credentials",
     credentials: {

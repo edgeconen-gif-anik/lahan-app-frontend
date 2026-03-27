@@ -46,10 +46,20 @@ export default function CommitteeContractPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const {
+      endDate,
+      totalEstimatedCost,
+      communityContribution,
+      beneficiaryHouseholds,
+      beneficiaryPopulation,
+      ...contractData
+    } = formData;
+
     createContract.mutate({
-      ...formData,
-      companyId: null, // Ensure company is null for committee contracts
+      ...contractData,
+      companyId: undefined, // Ensure company is omitted for committee contracts
       contractAmount: Number(formData.officeGrant), // The actual contract payout
+      intendedCompletionDate: endDate,
     });
   };
 
