@@ -29,6 +29,11 @@ export const companyService = {
     return data;
   },
 
+  approve: async (id: string) => {
+    const { data } = await api.patch<Company>(`/companies/${id}/approve`);
+    return data;
+  },
+
   // 5. Delete
   delete: async (id: string) => {
     const { data } = await api.delete(`/companies/${id}`);

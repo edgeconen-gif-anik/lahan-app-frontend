@@ -2,6 +2,7 @@
 import Link from "next/link";
 import Image from "next/image"; // Import Image
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
@@ -24,6 +25,11 @@ type SidebarProps = React.HTMLAttributes<HTMLDivElement>;
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
+  const visibleItems = isAdmin
+    ? sidebarItems
+    : sidebarItems.filter((item) => item.href !== "/dashboard/users");
 
   return (
     <div className={cn("pb-12 h-full bg-slate-50 dark:bg-slate-950 border-r", className)}>
@@ -49,7 +55,7 @@ export function Sidebar({ className }: SidebarProps) {
         {/* NAVIGATION LINKS */}
         <div className="px-3 py-2">
           <div className="space-y-1">
-            {sidebarItems.map((item) => {
+            {visibleItems.map((item) => {
               const isActive = item.href === "/dashboard"
                 ? pathname === "/dashboard"
                 : pathname.startsWith(item.href);

@@ -2,12 +2,19 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useCompanies, useDeleteCompany } from "@/hooks/company/useCompany";
+import { useSession } from "next-auth/react";
+import {
+  useCompanies,
+  useDeleteCompany,
+  useApproveCompany,
+} from "@/hooks/company/useCompany";
 import { useContracts } from "@/hooks/contract/useContracts";
 import {
   CompanyCategoryEnum,
   getCompanyIsContracted,
 } from "@/lib/schema/company.schema";
+import { isApprovedStatus } from "@/lib/schema/approval";
+import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 
 import {
   Table,
@@ -44,7 +51,8 @@ import {
   Phone,
   Search,
   Trash2,
-  Eye
+  Eye,
+  CheckCircle2,
 } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -62,9 +70,12 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function CompanyListPage() {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
   const { data: companies = [], isLoading: isLoadingCompanies } = useCompanies();
   const { data: contracts = [], isLoading: isLoadingContracts } = useContracts();
   const { mutate: deleteCompany } = useDeleteCompany();
+  const { mutate: approveCompany, isPending: isApprovingCompany } = useApproveCompany();
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
@@ -80,6 +91,7 @@ export default function CompanyListPage() {
     const counts = new Map<string, number>();
 
     contracts.forEach((contract) => {
+      if (!isApprovedStatus(contract.approvalStatus)) return;
       if (!contract.companyId) return;
       counts.set(contract.companyId, (counts.get(contract.companyId) ?? 0) + 1);
     });
@@ -94,13 +106,18 @@ export default function CompanyListPage() {
   /* ------------------ Stats ------------------ */
 
   const totalCompanies = companies.length;
+  const pendingCompanies = companies.filter(
+    (company) => company.approvalStatus === "PENDING"
+  ).length;
 
   const contractedCompanies = companies.filter(
-    (company) => isCompanyContracted(company)
+    (company) =>
+      isApprovedStatus(company.approvalStatus) && isCompanyContracted(company)
   ).length;
 
   const nonContractedCompanies = companies.filter(
-    (company) => !isCompanyContracted(company)
+    (company) =>
+      isApprovedStatus(company.approvalStatus) && !isCompanyContracted(company)
   ).length;
 
   /* ------------------ Filter + Sort ------------------ */
@@ -167,12 +184,21 @@ export default function CompanyListPage() {
 
       {/* Stats Cards */}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className={`grid gap-4 ${isAdmin ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
 
         <div className="p-4 rounded-lg border bg-white dark:bg-gray-950 shadow-sm">
           <p className="text-sm text-muted-foreground">Total Companies</p>
           <p className="text-2xl font-bold">{totalCompanies}</p>
         </div>
+
+        {isAdmin && (
+          <div className="p-4 rounded-lg border bg-white dark:bg-gray-950 shadow-sm">
+            <p className="text-sm text-muted-foreground">Pending Approval</p>
+            <p className="text-2xl font-bold text-amber-600">
+              {pendingCompanies}
+            </p>
+          </div>
+        )}
 
         <div className="p-4 rounded-lg border bg-white dark:bg-gray-950 shadow-sm">
           <p className="text-sm text-muted-foreground">Contracted</p>
@@ -309,15 +335,24 @@ export default function CompanyListPage() {
                   </TableCell>
 
                   <TableCell>
-                    {isCompanyContracted(company) ? (
-                      <Badge className="bg-green-100 text-green-700">
-                        Contracted
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary">
-                        Not Contracted
-                      </Badge>
-                    )}
+                    <div className="flex flex-col gap-2 items-start">
+                      <ApprovalStatusBadge status={company.approvalStatus} />
+                      {isApprovedStatus(company.approvalStatus) ? (
+                        isCompanyContracted(company) ? (
+                          <Badge className="bg-green-100 text-green-700">
+                            Contracted
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">
+                            Not Contracted
+                          </Badge>
+                        )
+                      ) : (
+                        <Badge variant="outline">
+                          Hidden from general users
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
 
                   <TableCell>
@@ -366,18 +401,30 @@ export default function CompanyListPage() {
                           </DropdownMenuItem>
                         </Link>
 
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setCompanyToDelete({
-                              id: company.id,
-                              name: company.name
-                            })
-                          }
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
+                        {isAdmin && company.approvalStatus !== "APPROVED" && (
+                          <DropdownMenuItem
+                            disabled={isApprovingCompany}
+                            onClick={() => approveCompany(company.id)}
+                          >
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Approve
+                          </DropdownMenuItem>
+                        )}
+
+                        {isAdmin && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setCompanyToDelete({
+                                id: company.id,
+                                name: company.name
+                              })
+                            }
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
 
                       </DropdownMenuContent>
 

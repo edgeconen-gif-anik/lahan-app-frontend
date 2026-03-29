@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useUserProfile } from "@/hooks/user/useUsers";
 import {
   ArrowLeft,
@@ -256,8 +257,33 @@ export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.id as string;
+  const { data: session, status } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
 
-  const { data: profile, isLoading, isError } = useUserProfile(userId);
+  const { data: profile, isLoading, isError } = useUserProfile(userId, {
+    enabled: isAdmin,
+  });
+
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="animate-spin text-muted-foreground" size={32} />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="p-6 space-y-4">
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft size={16} /> Back
+        </button>
+        <div className="bg-destructive/10 text-destructive p-4 rounded-md border flex items-center gap-2">
+          <AlertCircle size={18} /> Only admins can view user profiles here.
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -10,6 +10,7 @@ import type {
   UpdateContractPayload,
 } from "@/lib/schema/contract/contract";
 import { deriveProjectStatusFromContracts } from "@/lib/project-status";
+import { isApprovedStatus } from "@/lib/schema/approval";
 
 type ContractListParams = {
   projectId?: string;
@@ -49,7 +50,10 @@ const USER_COMMITTEE_QUERY_KEY = ["userCommittees"] as const;
 
 async function syncProjectStatus(projectId: string) {
   const contracts = await contractService.getAll({ projectId });
-  const status = deriveProjectStatusFromContracts(contracts);
+  const approvedContracts = contracts.filter((contract) =>
+    isApprovedStatus(contract.approvalStatus)
+  );
+  const status = deriveProjectStatusFromContracts(approvedContracts);
 
   await projectService.update({
     id: projectId,
@@ -116,7 +120,13 @@ export const useCreateContract = () => {
         );
       }
 
-      toast.success("Contract created successfully!");
+      const isApproved = isApprovedStatus(data.approvalStatus);
+
+      toast.success(
+        isApproved
+          ? "Contract created successfully!"
+          : "Contract submitted for admin approval"
+      );
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
@@ -127,7 +137,9 @@ export const useCreateContract = () => {
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumber() }),
       ]);
 
-      router.push(`/dashboard/contracts/${data.id}`);
+      router.push(
+        isApproved ? `/dashboard/contracts/${data.id}` : "/dashboard/contracts"
+      );
     },
 
     onError: (error: unknown) => {
@@ -138,6 +150,7 @@ export const useCreateContract = () => {
 
 export const useUpdateContract = () => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateContractPayload }) =>
@@ -173,7 +186,13 @@ export const useUpdateContract = () => {
         );
       }
 
-      toast.success("Contract updated successfully!");
+      const isApproved = isApprovedStatus(data.approvalStatus);
+
+      toast.success(
+        isApproved
+          ? "Contract updated successfully!"
+          : "Contract changes submitted for admin approval"
+      );
 
       await Promise.all([
         queryClient.invalidateQueries({
@@ -185,6 +204,10 @@ export const useUpdateContract = () => {
         queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
       ]);
+
+      if (!isApproved) {
+        router.push("/dashboard/contracts");
+      }
     },
 
     onError: (error: unknown) => {
@@ -210,6 +233,33 @@ export const useDeleteContract = () => {
 
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to delete contract"));
+    },
+  });
+};
+
+export const useApproveContract = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => contractService.approve(id),
+    onSuccess: async (data) => {
+      try {
+        await syncProjectStatus(data.projectId);
+      } catch (error) {
+        console.error("Failed to sync project status after contract approval:", error);
+      }
+
+      toast.success("Contract approved");
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
+        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
+      ]);
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to approve contract"));
     },
   });
 };

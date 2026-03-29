@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useUsers } from "@/hooks/user/useUsers";
 import {
   Search,
@@ -60,6 +61,8 @@ function UserAvatar({ name, image }: { name?: string | null; image?: string | nu
 
 export default function UsersPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
 
   const [search,      setSearch]      = useState("");
   const [designation, setDesignation] = useState("");
@@ -67,13 +70,16 @@ export default function UsersPage() {
   const [page,        setPage]        = useState(1);
   const LIMIT = 12;
 
-  const { data, isLoading, isError } = useUsers({
-    search:      search      || undefined,
-    designation: designation || undefined,
-    role:        role        || undefined,
-    page,
-    limit: LIMIT,
-  });
+  const { data, isLoading, isError } = useUsers(
+    {
+      search:      search      || undefined,
+      designation: designation || undefined,
+      role:        role        || undefined,
+      page,
+      limit: LIMIT,
+    },
+    { enabled: isAdmin }
+  );
 
   const users    = data?.data    ?? [];
   const meta     = data?.meta;
@@ -83,6 +89,25 @@ export default function UsersPage() {
   const handleSearch      = (v: string) => { setSearch(v);      setPage(1); };
   const handleDesignation = (v: string) => { setDesignation(v); setPage(1); };
   const handleRole        = (v: string) => { setRole(v);        setPage(1); };
+
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center items-center h-48">
+        <Loader2 className="animate-spin text-muted-foreground" size={32} />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-4 rounded-md">
+          <AlertCircle size={18} />
+          Only admins can view the users dashboard.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">

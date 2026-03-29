@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ApprovalStatusEnum } from "@/lib/schema/approval";
 
 //
 // ─── ENUMS ───────────────────────────────────────────────────────────────────
@@ -105,6 +106,8 @@ export const ContractSchema = z.object({
   actualCompletionDate:   z.string().nullable().optional(),
 
   status:  ContractStatusEnum,
+  approvalStatus: ApprovalStatusEnum,
+  approvedAt: z.string().nullable().optional(),
   remarks: z.string().nullable().optional(),
 
   // Foreign keys

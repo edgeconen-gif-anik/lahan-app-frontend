@@ -1,11 +1,12 @@
 // app/dashboard/contracts/page.tsx
 "use client";
 import React, { useState, useMemo } from "react";
-import { useContracts } from "@/hooks/contract/useContracts";
+import { useSession } from "next-auth/react";
+import { useApproveContract, useContracts } from "@/hooks/contract/useContracts";
 import {
   Plus, Search, Eye, FileText, Flag, Pencil, Trash2, X,
   AlertTriangle, Building2, Users, SlidersHorizontal,
-  CalendarClock, BadgeCheck, Clock, Ban, Archive, RefreshCw,
+  CalendarClock, BadgeCheck, Clock, Ban, Archive, RefreshCw, CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,6 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CONTRACT_KEYS } from "@/hooks/contract/useContracts";
 import { contractService } from "@/services/contract/contractService";
 import { toNepaliDate } from "@/lib/date-utils";
+import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,7 @@ type Contract = {
   intendedCompletionDate?: string;
   actualCompletionDate?: string | null;
   status?: ContractStatus;
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
   remarks?: string;
   project?: { id: string; name: string; sNo?: string };
   // ✅ Both relations — only one will be present per contract
@@ -409,6 +412,8 @@ function StatsBar({ contracts }: { contracts: Contract[] }) {
 
 export default function ContractLandingPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
   const [search, setSearch] = useState("");
   const [implFilter, setImplFilter] = useState<ImplementationFilter>("ALL");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -416,6 +421,7 @@ export default function ContractLandingPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const queryClient = useQueryClient();
+  const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
   const { data: rawContracts, isLoading } = useContracts();
 
   // Normalize: ensure we always have an array.
@@ -649,6 +655,9 @@ export default function ContractLandingPage() {
                     <ContractRow
                       key={contract.id}
                       contract={contract}
+                      isAdmin={isAdmin}
+                      isApproving={isApprovingContract}
+                      onApprove={() => approveContract(contract.id)}
                       onDelete={() => setContractToDelete(contract)}
                       onClick={() => router.push(`/dashboard/contracts/${contract.id}`)}
                     />
@@ -684,10 +693,16 @@ export default function ContractLandingPage() {
 
 function ContractRow({
   contract,
+  isAdmin,
+  isApproving,
+  onApprove,
   onDelete,
   onClick,
 }: {
   contract: Contract;
+  isAdmin: boolean;
+  isApproving: boolean;
+  onApprove: () => void;
   onDelete: () => void;
   onClick: () => void;
 }) {
@@ -760,6 +775,7 @@ function ContractRow({
       {/* Status — workflow stage + time health derived from dates */}
       <td className="px-4 py-3">
         <div className="flex flex-col gap-1">
+          <ApprovalStatusBadge status={contract.approvalStatus} />
           <StatusBadge status={contract.status} />
           <TimeHealthBadge contract={contract} />
         </div>
@@ -771,6 +787,16 @@ function ContractRow({
           className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         >
+          {isAdmin && contract.approvalStatus !== "APPROVED" && (
+            <button
+              onClick={onApprove}
+              disabled={isApproving}
+              className="inline-flex p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-emerald-600 transition-colors disabled:opacity-50"
+              title="Approve"
+            >
+              <CheckCircle2 size={15} />
+            </button>
+          )}
           <Link
             href={`/dashboard/contracts/${contract.id}`}
             className="inline-flex p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors"
@@ -785,13 +811,15 @@ function ContractRow({
           >
             <Pencil size={15} />
           </Link>
-          <button
-            onClick={onDelete}
-            className="inline-flex p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
-            title="Delete"
-          >
-            <Trash2 size={15} />
-          </button>
+          {isAdmin && (
+            <button
+              onClick={onDelete}
+              className="inline-flex p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
+              title="Delete"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
         </div>
       </td>
     </tr>

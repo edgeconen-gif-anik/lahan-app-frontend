@@ -11,21 +11,25 @@ export const userKeys = {
 };
 
 // ─── GET /users (paginated list) ─────────────────────────────────────────────
-export function useUsers(params: UserListParams = {}) {
+export function useUsers(
+  params: UserListParams = {},
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey:    userKeys.list(params),
     queryFn:     () => userService.getAll(params),
     placeholderData: keepPreviousData, // keeps previous page visible while next loads
     staleTime:   30_000,
+    enabled: options?.enabled ?? true,
   });
 }
 
 // ─── GET /users/:id/profile ───────────────────────────────────────────────────
-export function useUserProfile(id: string) {
+export function useUserProfile(id: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: userKeys.profile(id),
     queryFn:  () => userService.getProfile(id),
-    enabled:  !!id,
+    enabled:  Boolean(id) && (options?.enabled ?? true),
     staleTime: 30_000,
   });
 }
