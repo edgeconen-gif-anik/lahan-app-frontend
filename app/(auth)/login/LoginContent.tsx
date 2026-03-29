@@ -41,6 +41,9 @@ const loginSchema = z.object({
 
 type LoginContentProps = {
   isGoogleLoginEnabled: boolean;
+  isGoogleLoginReady: boolean;
+  googleRedirectUri?: string;
+  googleSetupMessage?: string;
 };
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -58,6 +61,9 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 
 export default function LoginContent({
   isGoogleLoginEnabled,
+  isGoogleLoginReady,
+  googleRedirectUri,
+  googleSetupMessage,
 }: LoginContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -101,7 +107,16 @@ export default function LoginContent({
   const handleGoogleLogin = () => {
     if (!isGoogleLoginEnabled) {
       setGlobalError(
-        "Google sign-in is not configured yet. Add real GOOGLE_CLIENT_SECRET and GOOGLE_CLIENT_ID or NEXT_PUBLIC_GOOGLE_CLIENT_ID values in .env.local."
+        googleSetupMessage ||
+          "Google sign-in is not configured yet. Add real GOOGLE_CLIENT_SECRET and GOOGLE_CLIENT_ID or NEXT_PUBLIC_GOOGLE_CLIENT_ID values in .env.local."
+      );
+      return;
+    }
+
+    if (!isGoogleLoginReady) {
+      setGlobalError(
+        googleSetupMessage ||
+          "Google sign-in needs NEXTAUTH_URL or AUTH_URL set to the exact app URL before it can start."
       );
       return;
     }
@@ -238,12 +253,17 @@ export default function LoginContent({
             Google
           </Button>
 
-          {!isGoogleLoginEnabled && (
+          {!isGoogleLoginReady && (
             <p className="text-center text-xs text-muted-foreground">
-              Google sign-in is visible now, but it still needs real
-              `GOOGLE_CLIENT_SECRET` and `GOOGLE_CLIENT_ID` or
-              `NEXT_PUBLIC_GOOGLE_CLIENT_ID` values before it can complete
-              successfully.
+              {googleSetupMessage ||
+                "Google sign-in needs additional setup before it can complete successfully."}
+              {googleRedirectUri ? (
+                <>
+                  {" "}
+                  Authorized redirect URI:{" "}
+                  <code>{googleRedirectUri}</code>
+                </>
+              ) : null}
             </p>
           )}
         </CardContent>

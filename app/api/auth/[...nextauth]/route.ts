@@ -9,8 +9,13 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://127.0.0.1:5000";
 
-const { clientId: googleClientId, clientSecret: googleClientSecret } =
-  getGoogleOAuthConfig();
+const {
+  clientId: googleClientId,
+  clientSecret: googleClientSecret,
+  authBaseUrl,
+  redirectUri: googleRedirectUri,
+  setupMessage: googleSetupMessage,
+} = getGoogleOAuthConfig();
 
 const providers: NextAuthOptions["providers"] = [
   CredentialsProvider({
@@ -45,6 +50,12 @@ const providers: NextAuthOptions["providers"] = [
 ];
 
 if (googleClientId && googleClientSecret) {
+  if (!authBaseUrl) {
+    console.warn(
+      `Google OAuth is configured with credentials, but no stable auth base URL was found. ${googleSetupMessage}`
+    );
+  }
+
   providers.unshift(
     GoogleProvider({
       clientId: googleClientId,
@@ -127,6 +138,10 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
 };
+
+if (googleRedirectUri) {
+  console.info(`Google OAuth redirect URI: ${googleRedirectUri}`);
+}
 
 const handler = NextAuth(authOptions);
 

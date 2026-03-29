@@ -16,6 +16,22 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Google OAuth Setup
+
+If you use Google sign-in locally, keep the auth origin fixed:
+
+```bash
+NEXTAUTH_URL=http://localhost:3000
+```
+
+Then add this exact Authorized redirect URI in Google Cloud:
+
+```bash
+http://localhost:3000/api/auth/callback/google
+```
+
+If you run the app on a different port, IP, or domain, update both values so they still match exactly.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
