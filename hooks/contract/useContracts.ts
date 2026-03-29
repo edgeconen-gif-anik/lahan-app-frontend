@@ -3,10 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { contractService } from "@/services/contract/contractService";
+import { projectService } from "@/services/project/projectService";
 import type {
+  Contract,
   CreateContractPayload,
   UpdateContractPayload,
 } from "@/lib/schema/contract/contract";
+import { deriveProjectStatusFromContracts } from "@/lib/project-status";
 
 type ContractListParams = {
   projectId?: string;
@@ -40,6 +43,19 @@ export const CONTRACT_KEYS = {
 };
 
 const COMPANY_QUERY_KEY = ["companies"] as const;
+const PROJECT_QUERY_KEY = ["projects"] as const;
+const USER_QUERY_KEY = ["users"] as const;
+const USER_COMMITTEE_QUERY_KEY = ["userCommittees"] as const;
+
+async function syncProjectStatus(projectId: string) {
+  const contracts = await contractService.getAll({ projectId });
+  const status = deriveProjectStatusFromContracts(contracts);
+
+  await projectService.update({
+    id: projectId,
+    payload: { status },
+  });
+}
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
@@ -90,12 +106,27 @@ export const useCreateContract = () => {
     mutationFn: (payload: CreateContractPayload) =>
       contractService.create(payload),
 
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      try {
+        await syncProjectStatus(data.projectId);
+      } catch (error) {
+        console.error("Failed to sync project status after contract creation:", error);
+        toast.error(
+          "Contract created, but the related project status could not be refreshed."
+        );
+      }
+
       toast.success("Contract created successfully!");
-      queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() });
-      queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY });
-      // Bust next-number so the next new-contract form gets a fresh suggestion
-      queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumber() });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
+        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumber() }),
+      ]);
+
       router.push(`/dashboard/contracts/${data.id}`);
     },
 
@@ -112,11 +143,48 @@ export const useUpdateContract = () => {
     mutationFn: ({ id, data }: { id: string; data: UpdateContractPayload }) =>
       contractService.update(id, data),
 
-    onSuccess: (_data, variables) => {
+    onMutate: ({ id }) => {
+      const previousContract = queryClient.getQueryData<Contract>(
+        CONTRACT_KEYS.detail(id)
+      );
+
+      return { previousContract };
+    },
+
+    onSuccess: async (data, variables, context) => {
+      const relatedProjectIds = Array.from(
+        new Set(
+          [
+            context?.previousContract?.projectId,
+            variables.data.projectId,
+            data.projectId,
+          ].filter((projectId): projectId is string => Boolean(projectId))
+        )
+      );
+
+      try {
+        await Promise.all(
+          relatedProjectIds.map((projectId) => syncProjectStatus(projectId))
+        );
+      } catch (error) {
+        console.error("Failed to sync project status after contract update:", error);
+        toast.error(
+          "Contract updated, but the related project status could not be refreshed."
+        );
+      }
+
       toast.success("Contract updated successfully!");
-      queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.detail(variables.id) });
-      queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() });
-      queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY });
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: CONTRACT_KEYS.detail(variables.id),
+        }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
+        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
+      ]);
     },
 
     onError: (error: unknown) => {

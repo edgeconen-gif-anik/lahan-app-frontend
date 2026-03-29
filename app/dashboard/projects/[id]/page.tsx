@@ -1,14 +1,32 @@
 // app/dashboard/projects/[id]/page.tsx
 "use client";
 
+import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useProject, useDeleteProject } from "@/hooks/project/useProjects";
+import { useContracts } from "@/hooks/contract/useContracts";
+import { deriveProjectStatusFromContracts } from "@/lib/project-status";
 import { Calendar, DollarSign, Briefcase, User, MapPin, Trash2 } from "lucide-react";
 
 export default function ProjectProfilePage() {
   const { id } = useParams();
   const { data: project, isLoading } = useProject(id as string);
+  const { data: contracts = [], isLoading: isContractsLoading } = useContracts({
+    projectId: id as string,
+  });
   const { mutate: deleteProject } = useDeleteProject();
+
+  const displayStatus = useMemo(() => {
+    if (!project) {
+      return "NOT_STARTED";
+    }
+
+    if (isContractsLoading) {
+      return project.status;
+    }
+
+    return deriveProjectStatusFromContracts(contracts);
+  }, [contracts, isContractsLoading, project]);
 
   if (isLoading) return <div className="p-10 text-center">Loading details...</div>;
   if (!project) return <div className="p-10 text-center">Project not found.</div>;
@@ -61,11 +79,11 @@ export default function ProjectProfilePage() {
         {/* Status Card */}
         <div className="bg-card p-6 rounded-xl border shadow-sm flex flex-col justify-center items-center">
           <span className="text-sm text-muted-foreground mb-2">Current Status</span>
-          <div className="text-2xl font-black text-primary">{project.status}</div>
+          <div className="text-2xl font-black text-primary">{displayStatus}</div>
           <div className="mt-4 w-full bg-muted rounded-full h-2">
             <div 
               className="bg-primary h-2 rounded-full" 
-              style={{ width: project.status === 'COMPLETED' ? '100%' : project.status === 'ONGOING' ? '50%' : '5%' }}
+              style={{ width: displayStatus === 'COMPLETED' ? '100%' : displayStatus === 'ONGOING' ? '50%' : displayStatus === 'ARCHIVED' ? '100%' : '5%' }}
             ></div>
           </div>
         </div>

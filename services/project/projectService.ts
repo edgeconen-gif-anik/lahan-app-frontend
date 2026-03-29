@@ -1,18 +1,19 @@
 //D:\Lahan Project APP\client\services\project\projectService.ts
 import api from "@/lib/api";
-import { Project,ProjectQueryParams,ProjectResponse } from "@/lib/schema";
+import { Project, ProjectQueryParams } from "@/lib/schema";
 import { ProjectFormValues } from "@/lib/schema/project.schema";
 
 export const projectService = {
   // 1. Get All (Paginated)
  getAll: async (params: ProjectQueryParams) => {
     const query = new URLSearchParams();
-    // ... your existing appends
-    if (params.search) query.append('search', params.search); 
-    
-    // 👇 ADD THESE LINES
-    if (params.sortBy) query.append('sortBy', params.sortBy);
-    if (params.sortOrder) query.append('sortOrder', params.sortOrder);
+    if (params.page) query.append("page", String(params.page));
+    if (params.limit) query.append("limit", String(params.limit));
+    if (params.search) query.append("search", params.search);
+    if (params.status) query.append("status", String(params.status));
+    if (params.fiscalYear) query.append("fiscalYear", params.fiscalYear);
+    if (params.sortBy) query.append("sortBy", params.sortBy);
+    if (params.sortOrder) query.append("sortOrder", params.sortOrder);
 
     const response = await api.get(`/projects?${query.toString()}`);
     return response.data;

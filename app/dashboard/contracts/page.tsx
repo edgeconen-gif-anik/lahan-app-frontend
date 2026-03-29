@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useContracts } from "@/hooks/contract/useContracts";
 import {
   Plus, Search, Eye, FileText, Flag, Pencil, Trash2, X,
-  AlertTriangle, Building2, Users, ChevronDown, SlidersHorizontal,
+  AlertTriangle, Building2, Users, SlidersHorizontal,
   CalendarClock, BadgeCheck, Clock, Ban, Archive, RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
@@ -341,12 +341,22 @@ function EmptyState({ filtered }: { filtered: boolean }) {
 
 // ─── Skeleton Row ─────────────────────────────────────────────────────────────
 
-function SkeletonRow() {
+const SKELETON_ROW_WIDTHS = [
+  ["76%", "64%", "85%", "88%", "63%", "72%", "84%", "80%"],
+  ["61%", "72%", "81%", "80%", "69%", "74%", "79%", "81%"],
+  ["86%", "68%", "86%", "84%", "86%", "63%", "76%", "84%"],
+  ["79%", "89%", "82%", "84%", "71%", "68%", "84%", "86%"],
+  ["73%", "74%", "65%", "70%", "62%", "79%", "63%", "63%"],
+] as const;
+
+function SkeletonRow({ rowIndex }: { rowIndex: number }) {
+  const widths = SKELETON_ROW_WIDTHS[rowIndex % SKELETON_ROW_WIDTHS.length];
+
   return (
     <tr className="border-b">
       {Array.from({ length: 8 }).map((_, i) => (
         <td key={i} className="p-4">
-          <div className="h-4 rounded bg-muted animate-pulse" style={{ width: `${60 + Math.random() * 30}%` }} />
+          <div className="h-4 rounded bg-muted animate-pulse" style={{ width: widths[i] }} />
         </td>
       ))}
     </tr>
@@ -631,7 +641,7 @@ export default function ContractLandingPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
+                  Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} rowIndex={i} />)
                 ) : filteredContracts.length === 0 ? (
                   <EmptyState filtered={isFiltered} />
                 ) : (

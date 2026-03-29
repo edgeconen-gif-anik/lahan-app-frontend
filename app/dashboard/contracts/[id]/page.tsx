@@ -10,6 +10,7 @@ import {
   CalendarDays, TrendingUp, Archive,
 } from "lucide-react";
 import { useContract, useUpdateContract } from "@/hooks/contract/useContracts";
+import type { UpdateContractPayload } from "@/lib/schema/contract/contract";
 import { toNepaliDate } from "@/lib/date-utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -152,12 +153,6 @@ function StatusUpdater({
   const [saving, setSaving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Error fix 1: useUpdateContract takes 0 arguments — id goes in the mutate payload.
-  // Error fix 2: `status` is not in UpdateContractPayload (backend schema gap).
-  //   Payload shape the hook expects: { id: string; data: UpdateContractPayload }
-  //   We cast the data portion as `any` to pass status through until the backend
-  //   adds `status` to UpdateContractSchema. Once it does, remove the cast:
-  //     await updateContract({ id: contractId, data: { status } });
   const { mutateAsync: updateContract } = useUpdateContract();
 
   useEffect(() => {
@@ -172,7 +167,11 @@ function StatusUpdater({
     if (status === currentStatus) { setOpen(false); return; }
     setSaving(true);
     try {
-      await updateContract({ id: contractId, data: { status } as any });
+      const statusUpdate: UpdateContractPayload & { status?: ContractStatus } = {
+        status,
+      };
+
+      await updateContract({ id: contractId, data: statusUpdate });
       onUpdated(status);
     } catch (e) {
       console.error(e);
