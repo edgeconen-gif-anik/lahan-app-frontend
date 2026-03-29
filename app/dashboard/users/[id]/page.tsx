@@ -22,11 +22,11 @@ import {
   Calendar,
 } from "lucide-react";
 import {
-  ProfileProject,
-  ManagedContract,
   Designation,
   Role,
 } from "@/lib/schema/user/user";
+import type { ContractStatus } from "@/lib/schema/contract/contract";
+import { ContractStatusBadge } from "@/components/contract-status-badge";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,24 +40,6 @@ const ROLE_LABEL: Record<Role, string> = {
   CREATOR:  "Creator",
   REVIEWER: "Reviewer",
   ADMIN:    "Admin",
-};
-
-const CONTRACT_STATUS_LABEL: Record<string, string> = {
-  NOT_STARTED:    "Not Started",
-  AGREEMENT:      "Agreement",
-  WORKORDER:      "Work Order",
-  WORKINPROGRESS: "In Progress",
-  COMPLETED:      "Completed",
-  ARCHIVED:       "Archived",
-};
-
-const CONTRACT_STATUS_COLOR: Record<string, string> = {
-  NOT_STARTED:    "bg-gray-100 text-gray-600",
-  AGREEMENT:      "bg-blue-100 text-blue-700",
-  WORKORDER:      "bg-indigo-100 text-indigo-700",
-  WORKINPROGRESS: "bg-yellow-100 text-yellow-700",
-  COMPLETED:      "bg-green-100 text-green-700",
-  ARCHIVED:       "bg-orange-100 text-orange-700",
 };
 
 function formatCurrency(n: number) {
@@ -137,9 +119,7 @@ function ContractRow({ contract }: {
 
       <span className="font-mono text-xs font-semibold">{contract.contractNumber}</span>
 
-      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONTRACT_STATUS_COLOR[contract.status]}`}>
-        {isCompleted && "✓ "}{CONTRACT_STATUS_LABEL[contract.status]}
-      </span>
+      <ContractStatusBadge status={contract.status as ContractStatus} compact />
 
       {(contract.company || contract.userCommittee) && (
         <span className="text-xs text-muted-foreground flex items-center gap-1">

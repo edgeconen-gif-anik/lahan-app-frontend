@@ -17,6 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { ContractStatusBadge } from "@/components/contract-status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 
@@ -366,6 +368,81 @@ export default function CompanyViewPage() {
 
         </div>
       </div>
+
+      <Card className="shadow-sm">
+        <CardHeader className="bg-slate-50/50 dark:bg-slate-900/50 border-b">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileSignature className="h-5 w-5 text-primary" /> Contract Milestones
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[780px]">
+              <thead className="bg-muted/30">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Contract
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Project
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Milestone
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Visibility
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Timeline
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {companyContracts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      No contracts are linked to this company yet.
+                    </td>
+                  </tr>
+                ) : (
+                  companyContracts.map((contract) => (
+                    <tr key={contract.id} className="border-t">
+                      <td className="px-6 py-4">
+                        <div className="space-y-1">
+                          <Link
+                            href={`/dashboard/contracts/${contract.id}`}
+                            className="font-mono font-semibold text-primary hover:underline"
+                          >
+                            {contract.contractNumber}
+                          </Link>
+                          <div className="text-sm text-muted-foreground">
+                            Rs. {Number(contract.contractAmount).toLocaleString()}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium">
+                        {contract.project?.name ?? "Unlinked Project"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <ContractStatusBadge status={contract.status} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <ApprovalStatusBadge status={contract.approvalStatus} />
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div>Start: {toFormalNepaliDate(contract.startDate)}</div>
+                        <div className="text-muted-foreground">
+                          Intended End: {toFormalNepaliDate(contract.intendedCompletionDate)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

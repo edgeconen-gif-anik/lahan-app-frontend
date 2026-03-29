@@ -163,6 +163,7 @@ export const CreateContractPayloadSchema = z
 
     contractNumber:  z.string().min(1),
     contractAmount:  z.number().positive(),
+    status:          ContractStatusEnum.optional(),
 
     startDate:              z.string(),
     intendedCompletionDate: z.string(),
@@ -214,6 +215,7 @@ export const UpdateContractPayloadSchema = z
 
     contractNumber:  z.string().min(1).optional(),
     contractAmount:  z.number().positive().optional(),
+    status:          ContractStatusEnum.optional(),
 
     startDate:              z.string().optional(),
     intendedCompletionDate: z.string().optional(),
@@ -254,6 +256,7 @@ export const UpdateContractPayloadSchema = z
 //
 
 export type Contract               = z.infer<typeof ContractSchema>;
+export type ContractStatus         = z.infer<typeof ContractStatusEnum>;
 export type CreateContractPayload  = z.infer<typeof CreateContractPayloadSchema>;
 export type UpdateContractPayload  = z.infer<typeof UpdateContractPayloadSchema>;
 export type AgreementPayload       = z.infer<typeof AgreementPayloadSchema>;

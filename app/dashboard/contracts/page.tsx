@@ -1,288 +1,125 @@
-// app/dashboard/contracts/page.tsx
 "use client";
-import React, { useState, useMemo } from "react";
-import { useSession } from "next-auth/react";
-import { useApproveContract, useContracts } from "@/hooks/contract/useContracts";
-import {
-  Plus, Search, Eye, FileText, Flag, Pencil, Trash2, X,
-  AlertTriangle, Building2, Users, SlidersHorizontal,
-  CalendarClock, BadgeCheck, Clock, Ban, Archive, RefreshCw, CheckCircle2,
-} from "lucide-react";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CONTRACT_KEYS } from "@/hooks/contract/useContracts";
+import { useRouter } from "next/navigation";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Building2,
+  CalendarClock,
+  CheckCircle2,
+  Eye,
+  FileText,
+  Plus,
+  Search,
+  Trash2,
+  Users,
+} from "lucide-react";
+import { CONTRACT_KEYS, useApproveContract, useContracts, useUpdateContractStatus } from "@/hooks/contract/useContracts";
 import { contractService } from "@/services/contract/contractService";
-import { toNepaliDate } from "@/lib/date-utils";
+import type { Contract, ContractStatus } from "@/lib/schema/contract/contract";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type ContractStatus =
-  | "NOT_STARTED"
-  | "AGREEMENT"
-  | "WORKORDER"
-  | "WORKINPROGRESS"
-  | "COMPLETED"
-  | "ARCHIVED";
-
-type Contract = {
-  id: string;
-  contractNumber: string;
-  contractAmount: number | string;
-  startDate?: string;
-  // ✅ Correct backend field names
-  intendedCompletionDate?: string;
-  actualCompletionDate?: string | null;
-  status?: ContractStatus;
-  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
-  remarks?: string;
-  project?: { id: string; name: string; sNo?: string };
-  // ✅ Both relations — only one will be present per contract
-  company?: { id: string; name: string; panNumber?: string };
-  userCommittee?: { id: string; name: string };
-  user?: { id: string; name: string | null; designation?: string };
-  agreement?: { id: string };
-  workOrder?: { id: string };
-};
+import {
+  ContractStatusBadge,
+  CONTRACT_STATUS_LABEL,
+  CONTRACT_STATUS_ORDER,
+} from "@/components/contract-status-badge";
+import { toNepaliDate } from "@/lib/date-utils";
 
 type ImplementationFilter = "ALL" | "COMPANY" | "USER_COMMITTEE";
-type StatusFilter = "ALL" | ContractStatus;
 
-// ─── Time Health ──────────────────────────────────────────────────────────────
-// Derives the "time health" of a contract from dates + workflow status.
-//   ongoing   : start passed, intended end is still in the future
-//   overdue   : intended end passed and contract is not yet completed/archived
-//   completed : actualCompletionDate is set OR status === COMPLETED
-//   not_started: start date hasn't arrived yet
-//   archived  : status === ARCHIVED
+type TimeHealth = "not_started" | "ongoing" | "overdue" | "completed" | "archived";
 
-type TimeHealth = "ongoing" | "overdue" | "completed" | "not_started" | "archived";
+function getTimeHealth(contract: Pick<Contract, "startDate" | "intendedCompletionDate" | "actualCompletionDate" | "status">): TimeHealth {
+  if (contract.status === "ARCHIVED") return "archived";
+  if (contract.status === "COMPLETED" || contract.actualCompletionDate) return "completed";
 
-function getTimeHealth(contract: {
-  startDate?: string | null;
-  intendedCompletionDate?: string | null;
-  actualCompletionDate?: string | null;
-  status?: ContractStatus;
-}): TimeHealth {
-  const { startDate, intendedCompletionDate, actualCompletionDate, status } = contract;
-  if (status === "ARCHIVED") return "archived";
-  if (status === "COMPLETED" || actualCompletionDate) return "completed";
-  const now      = new Date();
-  const start    = startDate    ? new Date(startDate)    : null;
-  const intended = intendedCompletionDate ? new Date(intendedCompletionDate) : null;
+  const now = new Date();
+  const start = contract.startDate ? new Date(contract.startDate) : null;
+  const intended = contract.intendedCompletionDate ? new Date(contract.intendedCompletionDate) : null;
+
   if (!start || now < start) return "not_started";
   if (intended && now > intended) return "overdue";
   return "ongoing";
 }
 
-// ─── Status Config ────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<
-  ContractStatus,
-  { label: string; icon: React.ReactNode; className: string }
-> = {
-  NOT_STARTED: {
-    label: "Not Started",
-    icon: <Clock size={11} />,
-    className:
-      "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700",
-  },
-  AGREEMENT: {
-    label: "Agreement",
-    icon: <FileText size={11} />,
-    className:
-      "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800",
-  },
-  WORKORDER: {
-    label: "Work Order",
-    icon: <BadgeCheck size={11} />,
-    className:
-      "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/50 dark:text-violet-400 dark:border-violet-800",
-  },
-  WORKINPROGRESS: {
-    label: "In Progress",
-    icon: <RefreshCw size={11} />,
-    className:
-      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800",
-  },
-  COMPLETED: {
-    label: "Completed",
-    icon: <Flag size={11} />,
-    className:
-      "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400 dark:border-green-800",
-  },
-  ARCHIVED: {
-    label: "Archived",
-    icon: <Archive size={11} />,
-    className:
-      "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-400 dark:border-zinc-700",
-  },
-};
-
-function StatusBadge({ status }: { status?: ContractStatus }) {
-  if (!status) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-muted text-muted-foreground border-border">
-        —
-      </span>
-    );
-  }
-  const cfg = STATUS_CONFIG[status];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.className}`}
-    >
-      {cfg.icon}
-      {cfg.label}
-    </span>
-  );
-}
-
-// Time-health badge — shown alongside the workflow status badge in the table
-const TIME_HEALTH_CONFIG: Record<TimeHealth, { label: string; icon: React.ReactNode; className: string }> = {
-  ongoing: {
-    label: "Ongoing",
-    icon: <RefreshCw size={10} />,
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800",
-  },
-  overdue: {
-    label: "Overdue",
-    icon: <Ban size={10} />,
-    className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800",
-  },
-  completed: {
-    label: "Done",
-    icon: <Flag size={10} />,
-    className: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400 dark:border-green-800",
-  },
-  not_started: {
-    label: "Not Started",
-    icon: <Clock size={10} />,
-    className: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700",
-  },
-  archived: {
-    label: "Archived",
-    icon: <Archive size={10} />,
-    className: "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-400 dark:border-zinc-700",
-  },
-};
-
 function TimeHealthBadge({ contract }: { contract: Contract }) {
   const health = getTimeHealth(contract);
-  const cfg = TIME_HEALTH_CONFIG[health];
+
+  const content: Record<TimeHealth, { label: string; className: string }> = {
+    not_started: {
+      label: "Timeline Not Started",
+      className: "bg-slate-100 text-slate-700",
+    },
+    ongoing: {
+      label: "On Track",
+      className: "bg-emerald-100 text-emerald-700",
+    },
+    overdue: {
+      label: "Overdue",
+      className: "bg-rose-100 text-rose-700",
+    },
+    completed: {
+      label: "Delivered",
+      className: "bg-green-100 text-green-700",
+    },
+    archived: {
+      label: "Archived",
+      className: "bg-zinc-100 text-zinc-700",
+    },
+  };
+
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${cfg.className}`}>
-      {cfg.icon}
-      {cfg.label}
+    <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-medium ${content[health].className}`}>
+      {content[health].label}
     </span>
   );
 }
-
-// ─── Implementation Badge ─────────────────────────────────────────────────────
-
-function ImplBadge({ contract }: { contract: Contract }) {
-  if (contract.company) {
-    return (
-      <div className="flex flex-col gap-0.5 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <Building2 size={12} className="text-blue-500 shrink-0" />
-          <span className="text-sm font-medium truncate max-w-[160px]">
-            {contract.company.name}
-          </span>
-        </div>
-        {contract.company.panNumber && (
-          <span className="text-xs text-muted-foreground pl-[20px]">
-            PAN: {contract.company.panNumber}
-          </span>
-        )}
-      </div>
-    );
-  }
-  if (contract.userCommittee) {
-    return (
-      <div className="flex flex-col gap-0.5 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <Users size={12} className="text-amber-500 shrink-0" />
-          <span className="text-sm font-medium truncate max-w-[160px]">
-            {contract.userCommittee.name}
-          </span>
-        </div>
-        <span className="text-xs text-muted-foreground pl-[20px]">
-          User Committee
-        </span>
-      </div>
-    );
-  }
-  return <span className="text-sm text-muted-foreground">—</span>;
-}
-
-// ─── Delete Confirmation Modal ────────────────────────────────────────────────
 
 function DeleteConfirmModal({
   contract,
-  onConfirm,
-  onCancel,
   isDeleting,
+  onCancel,
+  onConfirm,
 }: {
   contract: Contract;
-  onConfirm: () => void;
-  onCancel: () => void;
   isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-card border rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-4 animate-in fade-in-0 zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl">
         <div className="flex items-start gap-3">
-          <div className="p-2 bg-red-100 dark:bg-red-950/50 rounded-full shrink-0 mt-0.5">
-            <AlertTriangle size={18} className="text-red-600 dark:text-red-400" />
+          <div className="rounded-full bg-red-100 p-2 text-red-600">
+            <AlertTriangle className="h-5 w-5" />
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold">Delete Contract</h2>
-            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-              Are you sure you want to delete{" "}
-              <span className="font-mono font-semibold text-foreground">
-                {contract.contractNumber}
-              </span>
-              ? This action <span className="text-red-600 dark:text-red-400 font-medium">cannot be undone</span>.
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold">Delete Contract</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Delete <span className="font-mono font-semibold text-foreground">{contract.contractNumber}</span>?
+              This action cannot be undone.
             </p>
-            {contract.project && (
-              <p className="text-xs text-muted-foreground mt-2 bg-muted/50 rounded px-2 py-1">
-                Project: {contract.project.name}
-              </p>
-            )}
           </div>
-          <button
-            onClick={onCancel}
-            className="shrink-0 p-1 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X size={15} />
-          </button>
         </div>
-        <div className="flex gap-3 justify-end pt-1">
+        <div className="mt-6 flex justify-end gap-3">
           <button
+            type="button"
             onClick={onCancel}
-            disabled={isDeleting}
-            className="px-4 py-2 text-sm border rounded-lg hover:bg-muted transition-colors disabled:opacity-50 font-medium"
+            className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             disabled={isDeleting}
-            className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2 font-medium"
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
           >
-            {isDeleting ? (
-              <>
-                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Deleting...
-              </>
-            ) : (
-              <>
-                <Trash2 size={13} />
-                Delete
-              </>
-            )}
+            {isDeleting ? "Deleting..." : "Delete"}
           </button>
         </div>
       </div>
@@ -290,205 +127,266 @@ function DeleteConfirmModal({
   );
 }
 
-// ─── Filter Pill ──────────────────────────────────────────────────────────────
-
-function FilterPill({
-  active,
-  onClick,
-  children,
+function StatusCard({
+  label,
+  value,
+  accent,
 }: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
+  label: string;
+  value: number;
+  accent?: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap
-        ${active
-          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-          : "bg-background text-muted-foreground border-border hover:border-muted-foreground/40 hover:text-foreground"
-        }`}
-    >
-      {children}
-    </button>
+    <div className="rounded-xl border bg-card px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className={`mt-2 text-2xl font-bold ${accent ?? ""}`}>{value}</p>
+    </div>
   );
 }
 
-// ─── Empty State ──────────────────────────────────────────────────────────────
+function ContractRow({
+  contract,
+  isAdmin,
+  isUpdatingStatus,
+  isApproving,
+  onApprove,
+  onDelete,
+  onStatusChange,
+}: {
+  contract: Contract;
+  isAdmin: boolean;
+  isUpdatingStatus: boolean;
+  isApproving: boolean;
+  onApprove: () => void;
+  onDelete: () => void;
+  onStatusChange: (status: ContractStatus) => void;
+}) {
+  const canChangeStatus = isAdmin && contract.approvalStatus === "APPROVED";
+  const implementor = contract.company
+    ? {
+        icon: <Building2 className="h-4 w-4 text-blue-500" />,
+        label: contract.company.name,
+        sublabel: `PAN: ${contract.company.panNumber ?? "-"}`,
+      }
+    : contract.userCommittee
+      ? {
+          icon: <Users className="h-4 w-4 text-amber-500" />,
+          label: contract.userCommittee.name,
+          sublabel: "User Committee",
+        }
+      : null;
 
-function EmptyState({ filtered }: { filtered: boolean }) {
   return (
-    <tr>
-      <td colSpan={8} className="py-16 text-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
-            <FileText size={22} className="text-muted-foreground/50" />
+    <tr className="border-b align-top">
+      <td className="px-4 py-4">
+        <div className="space-y-2">
+          <div className="font-mono text-sm font-semibold text-primary">
+            {contract.contractNumber}
           </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">
-              {filtered ? "No contracts match your filters" : "No contracts yet"}
-            </p>
-            {!filtered && (
-              <p className="text-xs text-muted-foreground/70 mt-1">
-                Create your first contract to get started.
-              </p>
+          <div className="flex flex-wrap gap-2">
+            {contract.agreement && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700">
+                <FileText className="h-3 w-3" />
+                Agreement
+              </span>
+            )}
+            {contract.workOrder && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700">
+                <CalendarClock className="h-3 w-3" />
+                Work Order
+              </span>
             )}
           </div>
+        </div>
+      </td>
+
+      <td className="px-4 py-4">
+        <div className="space-y-1">
+          <div className="font-medium">{contract.project?.name ?? "Unlinked Project"}</div>
+          {contract.project?.sNo && (
+            <div className="text-xs text-muted-foreground">S.No: {contract.project.sNo}</div>
+          )}
+        </div>
+      </td>
+
+      <td className="px-4 py-4">
+        {implementor ? (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              {implementor.icon}
+              <span className="font-medium">{implementor.label}</span>
+            </div>
+            <div className="text-xs text-muted-foreground">{implementor.sublabel}</div>
+          </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">Not assigned</span>
+        )}
+      </td>
+
+      <td className="px-4 py-4">
+        <div className="space-y-2">
+          {canChangeStatus ? (
+            <select
+              value={contract.status}
+              disabled={isUpdatingStatus}
+              onChange={(event) => onStatusChange(event.target.value as ContractStatus)}
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+            >
+              {CONTRACT_STATUS_ORDER.map((status) => (
+                <option key={status} value={status}>
+                  {CONTRACT_STATUS_LABEL[status]}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <ContractStatusBadge status={contract.status} />
+          )}
+          {!canChangeStatus && isAdmin && contract.approvalStatus !== "APPROVED" && (
+            <p className="text-xs text-muted-foreground">Approve first to change milestone.</p>
+          )}
+          <TimeHealthBadge contract={contract} />
+        </div>
+      </td>
+
+      <td className="px-4 py-4">
+        <ApprovalStatusBadge status={contract.approvalStatus} />
+      </td>
+
+      <td className="px-4 py-4">
+        <div className="space-y-1 text-sm">
+          <div>
+            <span className="text-muted-foreground">Start:</span>{" "}
+            {toNepaliDate(contract.startDate) ?? "-"}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Intended End:</span>{" "}
+            {toNepaliDate(contract.intendedCompletionDate) ?? "-"}
+          </div>
+          <div className="font-medium">
+            Rs. {Number(contract.contractAmount ?? 0).toLocaleString()}
+          </div>
+        </div>
+      </td>
+
+      <td className="px-4 py-4">
+        <div className="flex items-center justify-end gap-2">
+          {isAdmin && contract.approvalStatus !== "APPROVED" && (
+            <button
+              type="button"
+              onClick={onApprove}
+              disabled={isApproving}
+              className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Approve
+            </button>
+          )}
+          <Link
+            href={`/dashboard/contracts/${contract.id}`}
+            className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            <Eye className="h-4 w-4" />
+            View
+          </Link>
+          <Link
+            href={`/dashboard/contracts/${contract.id}/edit`}
+            className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            <ArrowRight className="h-4 w-4" />
+            Edit
+          </Link>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          )}
         </div>
       </td>
     </tr>
   );
 }
 
-// ─── Skeleton Row ─────────────────────────────────────────────────────────────
-
-const SKELETON_ROW_WIDTHS = [
-  ["76%", "64%", "85%", "88%", "63%", "72%", "84%", "80%"],
-  ["61%", "72%", "81%", "80%", "69%", "74%", "79%", "81%"],
-  ["86%", "68%", "86%", "84%", "86%", "63%", "76%", "84%"],
-  ["79%", "89%", "82%", "84%", "71%", "68%", "84%", "86%"],
-  ["73%", "74%", "65%", "70%", "62%", "79%", "63%", "63%"],
-] as const;
-
-function SkeletonRow({ rowIndex }: { rowIndex: number }) {
-  const widths = SKELETON_ROW_WIDTHS[rowIndex % SKELETON_ROW_WIDTHS.length];
-
-  return (
-    <tr className="border-b">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <td key={i} className="p-4">
-          <div className="h-4 rounded bg-muted animate-pulse" style={{ width: widths[i] }} />
-        </td>
-      ))}
-    </tr>
-  );
-}
-
-// ─── Stats Bar ────────────────────────────────────────────────────────────────
-
-function StatsBar({ contracts }: { contracts: Contract[] }) {
-  const total = contracts.length;
-  const byCompany = contracts.filter((c) => !!c.company).length;
-  const byUC = contracts.filter((c) => !!c.userCommittee).length;
-  const inProgress = contracts.filter((c) => c.status === "WORKINPROGRESS").length;
-  const completed = contracts.filter((c) => c.status === "COMPLETED").length;
-  const totalAmount = contracts.reduce((sum, c) => sum + Number(c.contractAmount || 0), 0);
-
-  const stats = [
-    { label: "Total Contracts", value: total, sub: null },
-    { label: "By Company", value: byCompany, sub: <Building2 size={12} className="text-blue-500" /> },
-    { label: "By User Committee", value: byUC, sub: <Users size={12} className="text-amber-500" /> },
-    { label: "In Progress", value: inProgress, sub: <RefreshCw size={12} className="text-amber-500" /> },
-    { label: "Completed", value: completed, sub: <Flag size={12} className="text-green-500" /> },
-    {
-      label: "Total Value",
-      value: `रू ${totalAmount.toLocaleString()}`,
-      sub: null,
-      wide: true,
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      {stats.map((s) => (
-        <div
-          key={s.label}
-          className={`bg-card border rounded-lg px-4 py-3 space-y-1 ${s.wide ? "lg:col-span-1" : ""}`}
-        >
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {s.sub}
-            {s.label}
-          </div>
-          <p className="text-lg font-bold tracking-tight">{s.value}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function ContractLandingPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
+  const { data: contracts = [], isLoading } = useContracts();
+  const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
+  const { mutate: updateContractStatus, isPending: isUpdatingStatus } = useUpdateContractStatus();
+
   const [search, setSearch] = useState("");
-  const [implFilter, setImplFilter] = useState<ImplementationFilter>("ALL");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [implementationFilter, setImplementationFilter] =
+    useState<ImplementationFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | ContractStatus>("ALL");
   const [contractToDelete, setContractToDelete] = useState<Contract | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const queryClient = useQueryClient();
-  const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
-  const { data: rawContracts, isLoading } = useContracts();
-
-  // Normalize: ensure we always have an array.
-  // Cast through `unknown` first so TS doesn't complain when the hook's
-  // inferred return type narrows to `never` in certain error/loading states.
-  const contracts: Contract[] = useMemo(() => {
-    const raw = rawContracts as unknown;
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw as Contract[];
-    if (
-      typeof raw === "object" &&
-      raw !== null &&
-      "data" in raw &&
-      Array.isArray((raw as { data: unknown }).data)
-    ) {
-      return (raw as { data: Contract[] }).data;
-    }
-    return [];
-  }, [rawContracts]);
-
-  // ── Filtered list ────────────────────────────────────────────────────────
   const filteredContracts = useMemo(() => {
-    return contracts.filter((c) => {
-      // Text search — contract number, project name, company/UC name
-      const implementorName = c.company?.name ?? c.userCommittee?.name ?? "";
+    return contracts.filter((contract) => {
+      const implementorName = contract.company?.name ?? contract.userCommittee?.name ?? "";
       const matchesSearch =
         !search ||
-        c.contractNumber.toLowerCase().includes(search.toLowerCase()) ||
-        (c.project?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        contract.contractNumber.toLowerCase().includes(search.toLowerCase()) ||
+        (contract.project?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
         implementorName.toLowerCase().includes(search.toLowerCase());
 
-      // Implementation type filter
-      const matchesImpl =
-        implFilter === "ALL" ||
-        (implFilter === "COMPANY" && !!c.company) ||
-        (implFilter === "USER_COMMITTEE" && !!c.userCommittee);
+      const matchesImplementation =
+        implementationFilter === "ALL" ||
+        (implementationFilter === "COMPANY" && Boolean(contract.company)) ||
+        (implementationFilter === "USER_COMMITTEE" && Boolean(contract.userCommittee));
 
-      // Status filter
       const matchesStatus =
-        statusFilter === "ALL" || c.status === statusFilter;
+        statusFilter === "ALL" || contract.status === statusFilter;
 
-      return matchesSearch && matchesImpl && matchesStatus;
+      return matchesSearch && matchesImplementation && matchesStatus;
     });
-  }, [contracts, search, implFilter, statusFilter]);
+  }, [contracts, implementationFilter, search, statusFilter]);
 
-  const isFiltered = search !== "" || implFilter !== "ALL" || statusFilter !== "ALL";
+  const totalsByStatus = useMemo(
+    () =>
+      CONTRACT_STATUS_ORDER.reduce<Record<ContractStatus, number>>(
+        (acc, status) => {
+          acc[status] = contracts.filter((contract) => contract.status === status).length;
+          return acc;
+        },
+        {
+          NOT_STARTED: 0,
+          AGREEMENT: 0,
+          WORKORDER: 0,
+          WORKINPROGRESS: 0,
+          COMPLETED: 0,
+          ARCHIVED: 0,
+        }
+      ),
+    [contracts]
+  );
 
-  // ── Delete handler ───────────────────────────────────────────────────────
+  const pendingApprovals = contracts.filter(
+    (contract) => contract.approvalStatus === "PENDING"
+  ).length;
+
   const handleDeleteConfirm = async () => {
     if (!contractToDelete) return;
+
     setIsDeleting(true);
     try {
       await contractService.delete(contractToDelete.id);
       await queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() });
       setContractToDelete(null);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       alert("Failed to delete contract. Please try again.");
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  const clearFilters = () => {
-    setSearch("");
-    setImplFilter("ALL");
-    setStatusFilter("ALL");
   };
 
   return (
@@ -496,382 +394,154 @@ export default function ContractLandingPage() {
       {contractToDelete && (
         <DeleteConfirmModal
           contract={contractToDelete}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setContractToDelete(null)}
           isDeleting={isDeleting}
+          onCancel={() => setContractToDelete(null)}
+          onConfirm={handleDeleteConfirm}
         />
       )}
 
-      <div className="p-6 space-y-5">
-
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="flex justify-between items-start gap-4">
+      <div className="space-y-6 p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FileText size={24} className="text-primary" />
-              Contracts
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Manage and track all registered contracts.
+            <h1 className="text-3xl font-bold tracking-tight">Contract Milestones</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage contract milestones in one place and keep project, company, and user views in sync.
             </p>
           </div>
-          <Link
-            href="/dashboard/contracts/new"
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity text-sm font-medium shrink-0"
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/contracts/new")}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
-            <Plus size={16} />
+            <Plus className="h-4 w-4" />
             New Contract
-          </Link>
+          </button>
         </div>
 
-        {/* ── Stats ───────────────────────────────────────────────────────── */}
-        {!isLoading && contracts.length > 0 && (
-          <StatsBar contracts={contracts} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
+          <StatusCard label="Total" value={contracts.length} />
+          {CONTRACT_STATUS_ORDER.map((status) => (
+            <StatusCard
+              key={status}
+              label={CONTRACT_STATUS_LABEL[status]}
+              value={totalsByStatus[status]}
+            />
+          ))}
+        </div>
+
+        {isAdmin && (
+          <div className="rounded-xl border bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Pending approvals: <span className="font-semibold">{pendingApprovals}</span>
+          </div>
         )}
 
-        {/* ── Filters ─────────────────────────────────────────────────────── */}
-        <div className="bg-card border rounded-xl p-4 space-y-3">
-          {/* Search row */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search by contract no., project or implementor..."
-                className="w-full pl-9 pr-4 py-2 h-9 border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/60 transition-all"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-
-            {isFiltered && (
-              <button
-                onClick={clearFilters}
-                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 shrink-0"
-              >
-                Clear all
-              </button>
-            )}
-
-            <div className="ml-auto text-xs text-muted-foreground shrink-0">
-              {isLoading ? "Loading..." : (
-                <>
-                  <span className="font-medium text-foreground">{filteredContracts.length}</span>
-                  {" "}of {contracts.length} contracts
-                </>
-              )}
-            </div>
+        <div className="grid gap-3 rounded-xl border bg-card p-4 lg:grid-cols-[minmax(0,1fr),180px,180px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by contract no., project, company, or committee"
+              className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm"
+            />
           </div>
 
-          {/* Filter pills row */}
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
-              <SlidersHorizontal size={12} />
-              Filter:
-            </span>
+          <select
+            value={implementationFilter}
+            onChange={(event) =>
+              setImplementationFilter(event.target.value as ImplementationFilter)
+            }
+            className="h-10 rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="ALL">All Implementors</option>
+            <option value="COMPANY">Company</option>
+            <option value="USER_COMMITTEE">User Committee</option>
+          </select>
 
-            {/* Implementation type */}
-            <div className="flex gap-1.5 flex-wrap">
-              <FilterPill active={implFilter === "ALL"} onClick={() => setImplFilter("ALL")}>
-                All Types
-              </FilterPill>
-              <FilterPill active={implFilter === "COMPANY"} onClick={() => setImplFilter("COMPANY")}>
-                <Building2 size={11} />
-                Company
-              </FilterPill>
-              <FilterPill active={implFilter === "USER_COMMITTEE"} onClick={() => setImplFilter("USER_COMMITTEE")}>
-                <Users size={11} />
-                User Committee
-              </FilterPill>
-            </div>
-
-            <div className="w-px h-4 bg-border mx-1 shrink-0" />
-
-            {/* Status */}
-            <div className="flex gap-1.5 flex-wrap">
-              <FilterPill active={statusFilter === "ALL"} onClick={() => setStatusFilter("ALL")}>
-                All Statuses
-              </FilterPill>
-              {(Object.keys(STATUS_CONFIG) as ContractStatus[]).map((s) => (
-                <FilterPill key={s} active={statusFilter === s} onClick={() => setStatusFilter(s)}>
-                  {STATUS_CONFIG[s].icon}
-                  {STATUS_CONFIG[s].label}
-                </FilterPill>
-              ))}
-            </div>
-          </div>
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as "ALL" | ContractStatus)
+            }
+            className="h-10 rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="ALL">All Milestones</option>
+            {CONTRACT_STATUS_ORDER.map((status) => (
+              <option key={status} value={status}>
+                {CONTRACT_STATUS_LABEL[status]}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* ── Table ───────────────────────────────────────────────────────── */}
-        <div className="border rounded-xl overflow-hidden bg-card shadow-sm">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left whitespace-nowrap">
-              <thead className="bg-muted/40 border-b">
+            <table className="w-full min-w-[1280px] text-left">
+              <thead className="bg-muted/40">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Contract No.
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Contract
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Project
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    <div className="flex items-center gap-1">
-                      Implementor
-                      <span className="text-[10px] normal-case font-normal opacity-60">(Company / UC)</span>
-                    </div>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Implementor
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Amount
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Milestone
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Start (BS)
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Visibility
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Intended End (BS)
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Timeline / Amount
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody>
                 {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} rowIndex={i} />)
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                      Loading contracts...
+                    </td>
+                  </tr>
                 ) : filteredContracts.length === 0 ? (
-                  <EmptyState filtered={isFiltered} />
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                      No contracts match the current filters.
+                    </td>
+                  </tr>
                 ) : (
                   filteredContracts.map((contract) => (
                     <ContractRow
                       key={contract.id}
                       contract={contract}
                       isAdmin={isAdmin}
+                      isUpdatingStatus={isUpdatingStatus}
                       isApproving={isApprovingContract}
                       onApprove={() => approveContract(contract.id)}
                       onDelete={() => setContractToDelete(contract)}
-                      onClick={() => router.push(`/dashboard/contracts/${contract.id}`)}
+                      onStatusChange={(status) =>
+                        updateContractStatus({ id: contract.id, status })
+                      }
                     />
                   ))
                 )}
               </tbody>
             </table>
           </div>
-
-          {/* Table footer */}
           {!isLoading && filteredContracts.length > 0 && (
-            <div className="px-4 py-2.5 border-t bg-muted/20 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Showing {filteredContracts.length} of {contracts.length} contracts
-              </p>
-              {isFiltered && (
-                <button
-                  onClick={clearFilters}
-                  className="text-xs text-primary hover:underline"
-                >
-                  Clear filters
-                </button>
-              )}
+            <div className="border-t bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+              Showing {filteredContracts.length} of {contracts.length} contracts
             </div>
           )}
         </div>
       </div>
     </>
-  );
-}
-
-// ─── Contract Row ─────────────────────────────────────────────────────────────
-
-function ContractRow({
-  contract,
-  isAdmin,
-  isApproving,
-  onApprove,
-  onDelete,
-  onClick,
-}: {
-  contract: Contract;
-  isAdmin: boolean;
-  isApproving: boolean;
-  onApprove: () => void;
-  onDelete: () => void;
-  onClick: () => void;
-}) {
-  const hasAgreement = !!contract.agreement;
-  const hasWorkOrder = !!contract.workOrder;
-
-  return (
-    <tr
-      className="hover:bg-muted/30 transition-colors cursor-pointer group"
-      onClick={onClick}
-    >
-      {/* Contract Number */}
-      <td className="px-4 py-3">
-        <div className="flex flex-col gap-1">
-          <span className="font-mono font-bold text-primary text-sm">
-            {contract.contractNumber}
-          </span>
-          {/* Document indicators */}
-          <div className="flex gap-1">
-            {hasAgreement && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
-                <FileText size={9} />
-                Agr
-              </span>
-            )}
-            {hasWorkOrder && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-800">
-                <CalendarClock size={9} />
-                WO
-              </span>
-            )}
-          </div>
-        </div>
-      </td>
-
-      {/* Project */}
-      <td className="px-4 py-3">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="text-sm font-medium truncate max-w-[200px]">
-            {contract.project?.name ?? <span className="text-muted-foreground">—</span>}
-          </span>
-          {contract.project?.sNo && (
-            <span className="text-xs text-muted-foreground">S.No: {contract.project.sNo}</span>
-          )}
-        </div>
-      </td>
-
-      {/* ✅ Fixed: Implementor — shows Company OR User Committee correctly */}
-      <td className="px-4 py-3">
-        <ImplBadge contract={contract} />
-      </td>
-
-      {/* Amount */}
-      <td className="px-4 py-3">
-        <span className="text-sm font-mono font-medium">
-          रू {Number(contract.contractAmount).toLocaleString()}
-        </span>
-      </td>
-
-      {/* Start Date — ✅ using correct field name */}
-      <td className="px-4 py-3 text-sm text-muted-foreground">
-        {toNepaliDate(contract.startDate) ?? "—"}
-      </td>
-
-      {/* Intended Completion — ✅ using correct field name */}
-      <td className="px-4 py-3">
-        <IntendedDateCell contract={contract} />
-      </td>
-
-      {/* Status — workflow stage + time health derived from dates */}
-      <td className="px-4 py-3">
-        <div className="flex flex-col gap-1">
-          <ApprovalStatusBadge status={contract.approvalStatus} />
-          <StatusBadge status={contract.status} />
-          <TimeHealthBadge contract={contract} />
-        </div>
-      </td>
-
-      {/* Actions */}
-      <td className="px-4 py-3">
-        <div
-          className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {isAdmin && contract.approvalStatus !== "APPROVED" && (
-            <button
-              onClick={onApprove}
-              disabled={isApproving}
-              className="inline-flex p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-emerald-600 transition-colors disabled:opacity-50"
-              title="Approve"
-            >
-              <CheckCircle2 size={15} />
-            </button>
-          )}
-          <Link
-            href={`/dashboard/contracts/${contract.id}`}
-            className="inline-flex p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors"
-            title="View"
-          >
-            <Eye size={15} />
-          </Link>
-          <Link
-            href={`/dashboard/contracts/${contract.id}/edit`}
-            className="inline-flex p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            title="Edit"
-          >
-            <Pencil size={15} />
-          </Link>
-          {isAdmin && (
-            <button
-              onClick={onDelete}
-              className="inline-flex p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors"
-              title="Delete"
-            >
-              <Trash2 size={15} />
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-// ─── Intended Date Cell ───────────────────────────────────────────────────────
-// Shows overdue indicator if past intended date and not completed/archived
-
-function IntendedDateCell({ contract }: { contract: Contract }) {
-  const dateStr = contract.intendedCompletionDate;
-  if (!dateStr) return <span className="text-sm text-muted-foreground">—</span>;
-
-  const health    = getTimeHealth(contract);
-  const isOverdue = health === "overdue";
-  const isDone    = health === "completed";
-
-  // Days overdue / remaining
-  const now        = new Date();
-  const intended   = new Date(dateStr);
-  const diffDays   = Math.round(Math.abs(now.getTime() - intended.getTime()) / 86_400_000);
-
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className={`text-sm font-medium ${
-        isOverdue ? "text-red-600 dark:text-red-400" :
-        isDone    ? "text-green-600 dark:text-green-400" :
-        "text-muted-foreground"
-      }`}>
-        {toNepaliDate(dateStr)}
-      </span>
-
-      {isOverdue && (
-        <span className="flex items-center gap-0.5 text-[10px] text-red-500 font-medium">
-          <Ban size={9} />
-          {diffDays}d overdue
-        </span>
-      )}
-
-      {!isOverdue && !isDone && health === "ongoing" && (
-        <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
-          <Clock size={9} />
-          {diffDays}d left
-        </span>
-      )}
-
-      {contract.actualCompletionDate && (
-        <span className="flex items-center gap-0.5 text-[10px] text-green-600 dark:text-green-400">
-          <Flag size={9} />
-          Done: {toNepaliDate(contract.actualCompletionDate)}
-        </span>
-      )}
-    </div>
   );
 }
