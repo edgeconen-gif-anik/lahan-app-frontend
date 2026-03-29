@@ -9,6 +9,29 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://127.0.0.1:5000";
 
+function isLoopbackHost(value: string) {
+  try {
+    const parsedUrl = new URL(value);
+    return ["127.0.0.1", "localhost", "::1"].includes(parsedUrl.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isBackendUrlReady(value: string) {
+  if (!value) {
+    return false;
+  }
+
+  if (process.env.NODE_ENV === "production" && isLoopbackHost(value)) {
+    return false;
+  }
+
+  return true;
+}
+
+const isBackendConfigured = isBackendUrlReady(BACKEND_URL);
+
 const {
   clientId: googleClientId,
   clientSecret: googleClientSecret,
@@ -25,6 +48,14 @@ const providers: NextAuthOptions["providers"] = [
       password: { label: "Password", type: "password" },
     },
     async authorize(credentials) {
+      if (!isBackendConfigured) {
+        console.error(
+          "Credentials login blocked: BACKEND_URL/NEXT_PUBLIC_API_URL is missing or still points to a local address in production.",
+          BACKEND_URL
+        );
+        return null;
+      }
+
       try {
         const res = await axios.post(`${BACKEND_URL}/auth/login`, {
           email: credentials?.email,
@@ -73,6 +104,14 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
 
+      if (!isBackendConfigured) {
+        console.error(
+          "Google login blocked: BACKEND_URL/NEXT_PUBLIC_API_URL is missing or still points to a local address in production.",
+          BACKEND_URL
+        );
+        return "/login?error=BackendConfig";
+      }
+
       if (!account.id_token) {
         console.error("Google login failed: missing Google ID token");
         return "/login?error=GoogleTokenMissing";
@@ -100,11 +139,11 @@ export const authOptions: NextAuthOptions = {
             error.response.status,
             error.response.data
           );
+          return "/login?error=GoogleSyncFailed";
         } else {
           console.error("Google backend sync failed:", error);
+          return "/login?error=BackendUnavailable";
         }
-
-        return "/login?error=GoogleSyncFailed";
       }
     },
 

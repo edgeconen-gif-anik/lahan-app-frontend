@@ -48,6 +48,10 @@ type LoginContentProps = {
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   AccessDenied: "Google sign-in was denied. Please try again.",
+  BackendConfig:
+    "This deployment is missing the backend URL. Set NEXT_PUBLIC_API_URL or BACKEND_URL in Render and redeploy.",
+  BackendUnavailable:
+    "The app could not reach the backend service. Check the backend Render service URL and logs, then try again.",
   Callback: "Google sign-in could not be completed. Please try again.",
   GoogleSyncFailed:
     "Your Google account could not be connected to the app right now.",
