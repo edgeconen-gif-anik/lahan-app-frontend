@@ -8,6 +8,7 @@ import type {
   Contract,
   CreateContractPayload,
   ContractStatus,
+  NextContractNumberResponse,
   UpdateContractPayload,
 } from "@/lib/schema/contract/contract";
 import { deriveProjectStatusFromContracts } from "@/lib/project-status";
@@ -29,9 +30,162 @@ type MutationError = {
   };
 };
 
+type ContractNumberSource = "server" | "local" | "unavailable";
+
+type ContractNumberPattern = {
+  prefix: string;
+  width: number;
+  count: number;
+  maxSequence: number;
+};
+
 function getErrorMessage(error: unknown, fallback: string) {
   const message = (error as MutationError)?.response?.data?.message;
   return Array.isArray(message) ? message.join(", ") : (message ?? fallback);
+}
+
+function parseContractNumber(value?: string | null) {
+  if (!value) return null;
+
+  const match = value.trim().match(/^(.*?)(\d+)$/);
+  if (!match) return null;
+
+  return {
+    prefix: match[1],
+    sequence: Number(match[2]),
+    width: match[2].length,
+  };
+}
+
+function formatContractNumber(prefix: string, width: number, sequence: number) {
+  return `${prefix}${String(sequence).padStart(width, "0")}`;
+}
+
+function buildContractNumberPatterns(contracts: Contract[]) {
+  const patterns = new Map<string, ContractNumberPattern>();
+
+  for (const contract of contracts) {
+    const parsed = parseContractNumber(contract.contractNumber);
+    if (!parsed) continue;
+
+    const existing = patterns.get(parsed.prefix);
+    if (existing) {
+      existing.count += 1;
+      existing.width = Math.max(existing.width, parsed.width);
+      existing.maxSequence = Math.max(existing.maxSequence, parsed.sequence);
+      continue;
+    }
+
+    patterns.set(parsed.prefix, {
+      prefix: parsed.prefix,
+      width: parsed.width,
+      count: 1,
+      maxSequence: parsed.sequence,
+    });
+  }
+
+  return Array.from(patterns.values()).sort((a, b) =>
+    b.count - a.count ||
+    b.maxSequence - a.maxSequence ||
+    b.width - a.width
+  );
+}
+
+function pickFallbackPattern(
+  patterns: ContractNumberPattern[],
+  preferredPrefix?: string
+) {
+  if (preferredPrefix) {
+    const preferred = patterns.find((pattern) => pattern.prefix === preferredPrefix);
+    if (preferred) return preferred;
+  }
+
+  if (patterns.length === 1) return patterns[0] ?? null;
+
+  return patterns.find((pattern) => pattern.count > 1) ?? null;
+}
+
+function resolveNextContractNumber(
+  serverData: NextContractNumberResponse | undefined,
+  contracts: Contract[]
+) {
+  const patterns = buildContractNumberPatterns(contracts);
+  const serverParsed = parseContractNumber(serverData?.contractNumber);
+  const fallbackPattern = pickFallbackPattern(patterns, serverParsed?.prefix);
+  const serverSequence = serverData?.sequence ?? serverParsed?.sequence ?? 0;
+
+  if (serverParsed && fallbackPattern?.prefix === serverParsed.prefix) {
+    const nextSequence = Math.max(serverSequence, fallbackPattern.maxSequence + 1);
+    const width = Math.max(serverParsed.width, fallbackPattern.width);
+
+    return {
+      contractNumber: formatContractNumber(serverParsed.prefix, width, nextSequence),
+      sequence: nextSequence,
+      source: nextSequence === serverSequence ? "server" : "local",
+    } satisfies {
+      contractNumber: string;
+      sequence: number;
+      source: ContractNumberSource;
+    };
+  }
+
+  if (serverData?.contractNumber) {
+    if (fallbackPattern && serverSequence > 0 && serverSequence <= fallbackPattern.maxSequence) {
+      const nextSequence = fallbackPattern.maxSequence + 1;
+
+      return {
+        contractNumber: formatContractNumber(
+          fallbackPattern.prefix,
+          fallbackPattern.width,
+          nextSequence
+        ),
+        sequence: nextSequence,
+        source: "local",
+      } satisfies {
+        contractNumber: string;
+        sequence: number;
+        source: ContractNumberSource;
+      };
+    }
+
+    return {
+      contractNumber: serverData.contractNumber,
+      sequence: serverSequence,
+      source: "server",
+    } satisfies {
+      contractNumber: string;
+      sequence: number;
+      source: ContractNumberSource;
+    };
+  }
+
+  if (fallbackPattern) {
+    const nextSequence = fallbackPattern.maxSequence + 1;
+
+    return {
+      contractNumber: formatContractNumber(
+        fallbackPattern.prefix,
+        fallbackPattern.width,
+        nextSequence
+      ),
+      sequence: nextSequence,
+      source: "local",
+    } satisfies {
+      contractNumber: string;
+      sequence: number;
+      source: ContractNumberSource;
+    };
+  }
+
+  return {
+    contractNumber: "",
+    sequence: 0,
+    source: "unavailable",
+  } satisfies {
+    contractNumber: string;
+    sequence: number;
+    source: ContractNumberSource;
+  };
 }
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
@@ -85,7 +239,12 @@ export const useContract = (id: string) => {
  * staleTime/gcTime = 0: never serve a cached number — it changes after every create/delete.
  */
 export const useNextContractNumber = () => {
-  const { data, isLoading, isError, refetch } = useQuery({
+  const {
+    data,
+    isLoading: isLoadingServerNumber,
+    isError: isServerNumberError,
+    refetch: refetchServerNumber,
+  } = useQuery({
     queryKey: CONTRACT_KEYS.nextNumber(),
     queryFn:  contractService.getNextNumber,
     staleTime: 0,
@@ -93,12 +252,22 @@ export const useNextContractNumber = () => {
     retry:     false,
   });
 
+  const {
+    data: contracts = [],
+    isLoading: isLoadingContracts,
+    isError: isContractsError,
+    refetch: refetchContracts,
+  } = useContracts();
+
+  const resolved = resolveNextContractNumber(data, contracts);
+
   return {
-    contractNumber: data?.contractNumber ?? "",
-    sequence:       data?.sequence       ?? 0,
-    isLoading,
-    isError,
-    refetch,
+    contractNumber: resolved.contractNumber,
+    sequence:       resolved.sequence,
+    source:         resolved.source,
+    isLoading:      isLoadingServerNumber || isLoadingContracts,
+    isError:        resolved.source === "unavailable" && isServerNumberError && isContractsError,
+    refetch:        () => Promise.all([refetchServerNumber(), refetchContracts()]),
   };
 };
 

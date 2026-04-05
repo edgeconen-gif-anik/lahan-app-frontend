@@ -265,14 +265,16 @@ interface ContractNumberInputProps {
   value: string;
   onChange: (value: string) => void;
   serverSuggestedNumber: string;
+  numberSource?: "server" | "local" | "unavailable";
   isLoadingNumber?: boolean;
-  onRefetchNumber?: () => void;
+  onRefetchNumber?: () => void | Promise<unknown>;
 }
 
 function ContractNumberInput({
   value,
   onChange,
   serverSuggestedNumber,
+  numberSource = "server",
   isLoadingNumber = false,
   onRefetchNumber,
 }: ContractNumberInputProps) {
@@ -374,7 +376,13 @@ function ContractNumberInput({
             type="button"
             onClick={handleRegenerate}
             disabled={mode === "sequential" && isLoadingNumber}
-            title={mode === "sequential" ? "Re-fetch from server" : "Generate new UUID"}
+            title={
+              mode === "sequential"
+                ? numberSource === "local"
+                  ? "Refresh inferred sequence"
+                  : "Re-fetch from server"
+                : "Generate new UUID"
+            }
             className="p-2 h-10 w-10 flex items-center justify-center rounded-lg border bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-40"
           >
             <RefreshCw size={15} className={mode === "sequential" && isLoadingNumber ? "animate-spin" : ""} />
@@ -801,6 +809,7 @@ export default function NewContractPage() {
 
   const {
     contractNumber: serverContractNumber,
+    source: contractNumberSource,
     isLoading: isLoadingContractNumber,
     refetch: refetchContractNumber,
   } = useNextContractNumber();
@@ -1020,6 +1029,7 @@ export default function NewContractPage() {
                 value={formData.contractNumber}
                 onChange={(val) => setFormData((p) => ({ ...p, contractNumber: val }))}
                 serverSuggestedNumber={serverContractNumber}
+                numberSource={contractNumberSource}
                 isLoadingNumber={isLoadingContractNumber}
                 onRefetchNumber={refetchContractNumber}
               />
