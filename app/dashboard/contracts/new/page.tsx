@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   ArrowLeft,
   Save,
@@ -62,6 +63,12 @@ interface ComboboxOption {
   value: string;
   label: string;
   sublabel?: string;
+}
+
+interface ContractProjectOption {
+  id: string;
+  name: string;
+  sNo?: string | null;
 }
 
 interface SearchableSelectProps {
@@ -805,6 +812,8 @@ function ImplBadge({ type }: { type: "COMPANY" | "USER_COMMITTEE" }) {
 
 export default function NewContractPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
   const { mutateAsync: createContract, isPending } = useCreateContract();
 
   const {
@@ -824,14 +833,23 @@ export default function NewContractPage() {
   // ── Users: server-side search ───────────────────────────────────────────
   const [userSearch, setUserSearch] = useState("");
   const debouncedUserSearch = useDebounce(userSearch, 350);
-  const { data: users, isLoading: isLoadingUsers } = useUsers({
-    search: debouncedUserSearch,
-  });
+  const {
+    data: users,
+    isLoading: isLoadingUsers,
+    isError: isUsersError,
+  } = useUsers(
+    {
+      search: debouncedUserSearch,
+    },
+    { enabled: isAdmin }
+  );
 
   const { data: companies,      isLoading: isLoadingCompanies } = useCompanies();
   const { data: userCommittees, isLoading: isLoadingUC }        = useUserCommittees();
 
-  const projectOptions: ComboboxOption[] = extractList(projects).map((p: any) => ({
+  const availableProjects = extractList(projects) as ContractProjectOption[];
+
+  const projectOptions: ComboboxOption[] = availableProjects.map((p) => ({
     value: p.id,
     label: p.name,
     sublabel: p.sNo ? `S.No: ${p.sNo}` : undefined,
@@ -848,11 +866,18 @@ export default function NewContractPage() {
     label: uc.name,
   }));
 
-  const userOptions: ComboboxOption[] = extractList(users).map((u: any) => ({
+  const adminUserOptions: ComboboxOption[] = extractList(users).map((u: any) => ({
     value: u.id,
     label: u.name,
     sublabel: u.designation ?? u.email ?? undefined,
   }));
+  const currentUserOption: ComboboxOption[] = session?.user?.id
+    ? [{
+        value: session.user.id,
+        label: session.user.name ?? "Current User",
+        sublabel: session.user.email ?? "Logged in user",
+      }]
+    : [];
 
   const [includeAgreement,  setIncludeAgreement]  = useState(false);
   const [includeWorkOrder,  setIncludeWorkOrder]   = useState(false);
@@ -896,6 +921,24 @@ export default function NewContractPage() {
     const { name, value, type } = e.target;
     setFormData((prev) => ({ ...prev, [name]: type === "number" ? Number(value) : value }));
   };
+
+  const handleProjectChange = (projectId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      projectId,
+      siteInchargeId: isAdmin ? prev.siteInchargeId : (session?.user?.id ?? ""),
+    }));
+  };
+
+  const userOptions = isAdmin ? adminUserOptions : currentUserOption;
+  const siteInchargeValue = isAdmin
+    ? (formData.siteInchargeId ?? "")
+    : (session?.user?.id ?? "");
+  const siteInchargeHint = isAdmin
+    ? isUsersError
+      ? "Users could not be loaded. Check the users API permissions or try again."
+      : "Search and select the user responsible for site supervision."
+    : "Your login will be used as the site incharge for this contract.";
 
   const handleAgreementChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -977,7 +1020,9 @@ export default function NewContractPage() {
         projectId:               formData.projectId,
         companyId,
         userCommitteeId,
-        siteInchargeId: formData.siteInchargeId || undefined,
+        siteInchargeId:          isAdmin
+          ? (formData.siteInchargeId || undefined)
+          : (session?.user?.id || undefined),
         agreement,
         workOrder,
       } as CreateContractPayload);
@@ -1055,7 +1100,7 @@ export default function NewContractPage() {
               <SearchableSelect
                 options={projectOptions}
                 value={formData.projectId}
-                onChange={(val) => setFormData((p) => ({ ...p, projectId: val }))}
+                onChange={handleProjectChange}
                 placeholder="Select a project"
                 searchPlaceholder="Search by name or S.No..."
                 isLoading={isLoadingProjects}
@@ -1066,17 +1111,18 @@ export default function NewContractPage() {
             </Field>
 
             {/* Site Incharge */}
-            <Field label="Site Incharge" required>
+            <Field label="Site Incharge" required hint={siteInchargeHint}>
               <SearchableSelect
                 options={userOptions}
-                value={formData.siteInchargeId ?? ""}
+                value={siteInchargeValue}
                 onChange={(val) => setFormData((p) => ({ ...p, siteInchargeId: val }))}
-                placeholder="Select site incharge"
+                placeholder={isAdmin ? "Select site incharge" : "Current logged-in user"}
                 searchPlaceholder="Search by name..."
-                isLoading={isLoadingUsers}
+                isLoading={isAdmin ? isLoadingUsers : false}
                 required
-                onSearchChange={setUserSearch}
-                searchValue={userSearch}
+                disabled={!isAdmin}
+                onSearchChange={isAdmin ? setUserSearch : undefined}
+                searchValue={isAdmin ? userSearch : undefined}
               />
             </Field>
 
