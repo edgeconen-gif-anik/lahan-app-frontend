@@ -4,13 +4,22 @@ import React, { useState, useRef, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, Edit, FileText, ClipboardList, CheckSquare,
-  Building2, Users, User, Calendar, Hash, AlertTriangle,
-  CheckCircle2, Clock, XCircle, BadgeCheck, Loader2, Flag,
-  ChevronDown, ChevronRight, Pencil, Save, X, Ban,
+  Building2, Users, User, Hash, AlertTriangle,
+  CheckCircle2, Clock, BadgeCheck, Loader2,
+  ChevronDown, Pencil, Ban, Printer,
   CalendarDays, TrendingUp, Archive,
 } from "lucide-react";
 import { useContract, useUpdateContract } from "@/hooks/contract/useContracts";
 import type { UpdateContractPayload } from "@/lib/schema/contract/contract";
+import {
+  buildAgreementDraftFromContract,
+  buildWorkOrderDraftFromContract,
+  formatContractCurrency,
+  getContractDocumentVariant,
+  getDocumentPartyLabel,
+  getDocumentSignatoryLabel,
+  hasCustomDocumentText,
+} from "@/lib/contract-documents";
 import { toNepaliDate } from "@/lib/date-utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -430,7 +439,6 @@ function ContractTimeline({ contract }: {
         {/* ── Staggered labels below bar ── */}
         {bottomMarkers.map((m, i) => {
           const laneY  = LANE_Y[lanes[i]];   // px below top of outer div
-          const topPx  = 28 + 12 + laneY;    // bar-top + bar-height + lane offset
           const tickH  = laneY - 4;           // tick connects dot bottom → label
 
           // Clamp horizontal alignment so labels don't overflow left/right edges
@@ -519,7 +527,92 @@ function Section({ title, icon, children, collapsible = false }: {
   );
 }
 
+function DocumentActionCard({
+  accent,
+  available,
+  detail,
+  icon,
+  meta,
+  onOpen,
+  onPrint,
+  title,
+}: {
+  accent: "blue" | "violet";
+  available: boolean;
+  detail: string;
+  icon: React.ReactNode;
+  meta: string;
+  onOpen?: () => void;
+  onPrint?: () => void;
+  title: string;
+}) {
+  const accentCls = accent === "blue"
+    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900"
+    : "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900";
+
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${accentCls}`}>
+          {icon}
+        </div>
+        <span
+          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+            available
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+          }`}
+        >
+          {available ? "Ready" : "Not Attached"}
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-1.5">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+        <p className="text-xs font-medium text-muted-foreground">{meta}</p>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onOpen}
+          disabled={!available || !onOpen}
+          className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {icon}
+          Open
+        </button>
+        <button
+          type="button"
+          onClick={onPrint}
+          disabled={!available || !onPrint}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Printer size={14} />
+          Print
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
+
+function DocumentTextBlock({
+  text,
+  title,
+}: {
+  text: string;
+  title: string;
+}) {
+  return (
+    <div className="mt-3 space-y-1.5 rounded-lg border bg-muted/30 p-3">
+      <p className="text-xs font-medium text-muted-foreground">{title}</p>
+      <p className="text-sm leading-relaxed text-foreground/90">{text}</p>
+    </div>
+  );
+}
 
 export default function ContractDetailPage() {
   const router  = useRouter();
@@ -551,6 +644,23 @@ export default function ContractDetailPage() {
 
   const displayStatus = (localStatus ?? contract.status) as ContractStatus;
   const health        = getTimeHealth({ ...contract, status: displayStatus });
+  const openDocumentPrint = (path: string) => {
+    window.open(`${path}?print=1`, "_blank", "noopener,noreferrer");
+  };
+  const documentVariant = getContractDocumentVariant(contract);
+  const documentPartyLabel = getDocumentPartyLabel(documentVariant);
+  const agreementDraftText = contract.agreement
+    ? buildAgreementDraftFromContract(contract)
+    : "";
+  const workOrderDraftText = contract.workOrder
+    ? buildWorkOrderDraftFromContract(contract)
+    : "";
+  const agreementHasCustomText = contract.agreement
+    ? hasCustomDocumentText(contract.agreement.content, agreementDraftText)
+    : false;
+  const workOrderHasCustomText = contract.workOrder
+    ? hasCustomDocumentText(contract.workOrder.content, workOrderDraftText)
+    : false;
 
   const implementor = contract.company
     ? { type: "company"   as const, name: contract.company.name, sub: contract.company.panNumber ? `PAN: ${contract.company.panNumber}` : undefined }
@@ -584,6 +694,24 @@ export default function ContractDetailPage() {
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 shrink-0">
+          {contract.agreement && (
+            <button
+              onClick={() => router.push(`/dashboard/contracts/${id}/agreement`)}
+              className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <FileText size={13} />
+              Agreement
+            </button>
+          )}
+          {contract.workOrder && (
+            <button
+              onClick={() => router.push(`/dashboard/contracts/${id}/work-order`)}
+              className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <ClipboardList size={13} />
+              Work Order
+            </button>
+          )}
           <StatusUpdater
             currentStatus={displayStatus}
             contractId={id as string}
@@ -653,6 +781,7 @@ export default function ContractDetailPage() {
           title="Implementation"
           icon={implementor.type === "company" ? <Building2 size={16} /> : <Users size={16} />}
         >
+          <InfoRow label="Document Format" value={documentPartyLabel} />
           <div className="flex items-center gap-3 py-1">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0
               ${implementor.type === "company"
@@ -690,6 +819,64 @@ export default function ContractDetailPage() {
         </Section>
       )}
 
+      <Section title="Documents" icon={<CheckSquare size={16} />}>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <DocumentActionCard
+            accent="blue"
+            available={!!contract.agreement}
+            detail={
+              contract.agreement
+                ? `${documentPartyLabel} agreement ready to open or print directly from this page.`
+                : "Attach an agreement to unlock the printable agreement document."
+            }
+            icon={<FileText size={18} />}
+            meta={
+              contract.agreement
+                ? `${agreementHasCustomText ? "Custom recorded terms" : "Auto-generated terms"} | Amount: ${formatContractCurrency(contract.agreement.amount)}`
+                : "Agreement document is not available yet."
+            }
+            onOpen={
+              contract.agreement
+                ? () => router.push(`/dashboard/contracts/${id}/agreement`)
+                : undefined
+            }
+            onPrint={
+              contract.agreement
+                ? () => openDocumentPrint(`/dashboard/contracts/${id}/agreement`)
+                : undefined
+            }
+            title="Agreement Document"
+          />
+
+          <DocumentActionCard
+            accent="violet"
+            available={!!contract.workOrder}
+            detail={
+              contract.workOrder
+                ? `${documentPartyLabel} work order ready to open, print, and share for execution.`
+                : "Attach a work order to unlock the standard printable work order."
+            }
+            icon={<ClipboardList size={18} />}
+            meta={
+              contract.workOrder
+                ? `${workOrderHasCustomText ? "Custom recorded scope" : "Auto-generated scope"} | Completion target: ${formatBsDate(contract.workOrder.workCompletionDate)}`
+                : "Work order document is not available yet."
+            }
+            onOpen={
+              contract.workOrder
+                ? () => router.push(`/dashboard/contracts/${id}/work-order`)
+                : undefined
+            }
+            onPrint={
+              contract.workOrder
+                ? () => openDocumentPrint(`/dashboard/contracts/${id}/work-order`)
+                : undefined
+            }
+            title="Work Order Document"
+          />
+        </div>
+      </Section>
+
       {/* ── Agreement ── */}
       <Section
         title={contract.agreement ? "Agreement" : "Agreement — Not Attached"}
@@ -700,14 +887,22 @@ export default function ContractDetailPage() {
           <>
             <InfoRow label="Agreement Date (BS)" value={formatBsDate(contract.agreement.agreementDate)} />
             <InfoRow label="Amount" value={formatCurrency(contract.agreement.amount)} accent />
-            {contract.agreement.content && (
-              <div className="mt-3 pt-3 border-t">
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Content</p>
-                <p className="text-sm leading-relaxed text-foreground/90 bg-muted/30 rounded-lg p-3">
-                  {contract.agreement.content}
-                </p>
-              </div>
-            )}
+            <InfoRow
+              label="Text Source"
+              value={agreementHasCustomText ? "Custom recorded terms" : "Auto-generated from contract details"}
+            />
+            <div className="mt-3 border-t pt-3">
+              <DocumentTextBlock
+                title="Printable Summary"
+                text={agreementDraftText}
+              />
+              {agreementHasCustomText && (
+                <DocumentTextBlock
+                  title="Recorded Terms"
+                  text={contract.agreement.content}
+                />
+              )}
+            </div>
             {(contract.agreement.officeSignatory || contract.agreement.contractorSignatory || contract.agreement.witnessName) && (
               <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {contract.agreement.officeSignatory && (
@@ -715,7 +910,7 @@ export default function ContractDetailPage() {
                 )}
                 {contract.agreement.contractorSignatory && (
                   <SignatoryCard
-                    role={implementor?.type === "committee" ? "Committee Signatory" : "Contractor Signatory"}
+                    role={getDocumentSignatoryLabel(documentVariant)}
                     name={contract.agreement.contractorSignatory}
                   />
                 )}
@@ -739,14 +934,22 @@ export default function ContractDetailPage() {
         {contract.workOrder ? (
           <>
             <InfoRow label="Work Completion Date (BS)" value={formatBsDate(contract.workOrder.workCompletionDate)} />
-            {contract.workOrder.content && (
-              <div className="mt-3 pt-3 border-t">
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Scope of Work</p>
-                <p className="text-sm leading-relaxed text-foreground/90 bg-muted/30 rounded-lg p-3">
-                  {contract.workOrder.content}
-                </p>
-              </div>
-            )}
+            <InfoRow
+              label="Text Source"
+              value={workOrderHasCustomText ? "Custom recorded scope" : "Auto-generated from contract details"}
+            />
+            <div className="mt-3 border-t pt-3">
+              <DocumentTextBlock
+                title="Printable Summary"
+                text={workOrderDraftText}
+              />
+              {workOrderHasCustomText && (
+                <DocumentTextBlock
+                  title="Recorded Scope"
+                  text={contract.workOrder.content}
+                />
+              )}
+            </div>
             {(contract.workOrder.officeSignatory || contract.workOrder.contractorSignatory || contract.workOrder.witnessName) && (
               <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {contract.workOrder.officeSignatory && (
@@ -754,7 +957,7 @@ export default function ContractDetailPage() {
                 )}
                 {contract.workOrder.contractorSignatory && (
                   <SignatoryCard
-                    role={implementor?.type === "committee" ? "Committee Signatory" : "Contractor Signatory"}
+                    role={getDocumentSignatoryLabel(documentVariant)}
                     name={contract.workOrder.contractorSignatory}
                   />
                 )}
