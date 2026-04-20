@@ -2,11 +2,16 @@ import api from "@/lib/api";
 import {
   Contract,
   CreateContractPayload,
+  ProjectUpdatePayload,
   UpdateContractPayload,
   NextContractNumberResponse,
 } from "@/lib/schema/contract/contract";
 
-export type { CreateContractPayload, UpdateContractPayload };
+export type {
+  CreateContractPayload,
+  ProjectUpdatePayload,
+  UpdateContractPayload,
+};
 
 export const contractService = {
   getAll: async (params?: {
@@ -36,6 +41,11 @@ export const contractService = {
 
   update: async (id: string, payload: UpdateContractPayload): Promise<Contract> => {
     const { data } = await api.patch<Contract>(`/contracts/${id}`, payload);
+    return data;
+  },
+
+  projectUpdate: async (id: string, payload: ProjectUpdatePayload): Promise<Contract> => {
+    const { data } = await api.patch<Contract>(`/contracts/${id}/project-update`, payload);
     return data;
   },
 

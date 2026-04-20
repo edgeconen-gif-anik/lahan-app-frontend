@@ -99,7 +99,9 @@ export const WorkOrderSchema = z.object({
 export const ContractSchema = z.object({
   id:             z.string(),
   contractNumber: z.string(),
+  completionCode: z.string().nullable().optional(),
   contractAmount: z.number(),
+  finalEvaluatedAmount: z.number().nullable().optional(),
 
   startDate:              z.string(), // ISO
   intendedCompletionDate: z.string(), // ISO
@@ -161,9 +163,10 @@ export const CreateContractPayloadSchema = z
     userID:          z.string().uuid().optional(), // ✅ userID — committee rep
     siteInchargeId:  z.string().uuid().optional(), // ✅ added
 
-    contractNumber:  z.string().min(1),
-    contractAmount:  z.number().positive(),
-    status:          ContractStatusEnum.optional(),
+    contractNumber:      z.string().min(1),
+    contractAmount:      z.number().positive(),
+    finalEvaluatedAmount: z.number().positive().optional(),
+    status:              ContractStatusEnum.optional(),
 
     startDate:              z.string(),
     intendedCompletionDate: z.string(),
@@ -213,9 +216,10 @@ export const UpdateContractPayloadSchema = z
     userID:          z.string().uuid().optional(), // ✅ userID — matches Prisma field
     siteInchargeId:  z.string().uuid().optional(), // ✅ added
 
-    contractNumber:  z.string().min(1).optional(),
-    contractAmount:  z.number().positive().optional(),
-    status:          ContractStatusEnum.optional(),
+    contractNumber:      z.string().min(1).optional(),
+    contractAmount:      z.number().positive().optional(),
+    finalEvaluatedAmount: z.number().positive().optional(),
+    status:              ContractStatusEnum.optional(),
 
     startDate:              z.string().optional(),
     intendedCompletionDate: z.string().optional(),
@@ -261,6 +265,13 @@ export type CreateContractPayload  = z.infer<typeof CreateContractPayloadSchema>
 export type UpdateContractPayload  = z.infer<typeof UpdateContractPayloadSchema>;
 export type AgreementPayload       = z.infer<typeof AgreementPayloadSchema>;
 export type WorkOrderPayload       = z.infer<typeof WorkOrderPayloadSchema>;
+
+export const ProjectUpdatePayloadSchema = z.object({
+  finalEvaluatedAmount: z.number().positive(),
+  actualCompletionDate: z.string().optional(),
+});
+
+export type ProjectUpdatePayload = z.infer<typeof ProjectUpdatePayloadSchema>;
 
 //
 // ─── UTILITY ─────────────────────────────────────────────────────────────────

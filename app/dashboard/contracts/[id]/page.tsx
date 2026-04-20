@@ -161,6 +161,7 @@ function StatusUpdater({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const { mutateAsync: updateContract } = useUpdateContract();
 
@@ -174,6 +175,11 @@ function StatusUpdater({
 
   const handleSelect = async (status: ContractStatus) => {
     if (status === currentStatus) { setOpen(false); return; }
+    if (status === "COMPLETED") {
+      setOpen(false);
+      router.push(`/dashboard/contracts/${contractId}/contract-update`);
+      return;
+    }
     setSaving(true);
     try {
       const statusUpdate: UpdateContractPayload & { status?: ContractStatus } = {
@@ -712,6 +718,13 @@ export default function ContractDetailPage() {
               Work Order
             </button>
           )}
+          <button
+            onClick={() => router.push(`/dashboard/contracts/${id}/contract-update`)}
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <CheckSquare size={13} />
+            Contract Update
+          </button>
           <StatusUpdater
             currentStatus={displayStatus}
             contractId={id as string}
@@ -738,6 +751,14 @@ export default function ContractDetailPage() {
           <span className="font-mono">{contract.contractNumber}</span>
         } accent />
         <InfoRow label="Contract Amount" value={formatCurrency(contract.contractAmount)} accent />
+        <InfoRow
+          label="Final Evaluated Amount"
+          value={
+            contract.finalEvaluatedAmount != null
+              ? formatCurrency(contract.finalEvaluatedAmount)
+              : <span className="text-muted-foreground italic text-xs">Not recorded yet</span>
+          }
+        />
         <InfoRow label="Start Date (BS)" value={formatBsDate(contract.startDate)} />
         <InfoRow
           label="Intended Completion (BS)"
@@ -758,6 +779,14 @@ export default function ContractDetailPage() {
             contract.actualCompletionDate
               ? <span className="text-green-600 dark:text-green-400">{formatBsDate(contract.actualCompletionDate)}</span>
               : <span className="text-muted-foreground italic text-xs">Not yet completed</span>
+          }
+        />
+        <InfoRow
+          label="Completion Code"
+          value={
+            contract.completionCode
+              ? <span className="font-mono text-emerald-700 dark:text-emerald-400">{contract.completionCode}</span>
+              : <span className="text-muted-foreground italic text-xs">Will generate after contract update</span>
           }
         />
         {contract.remarks && (

@@ -9,6 +9,7 @@ import type {
   CreateContractPayload,
   ContractStatus,
   NextContractNumberResponse,
+  ProjectUpdatePayload,
   UpdateContractPayload,
 } from "@/lib/schema/contract/contract";
 import { deriveProjectStatusFromContracts } from "@/lib/project-status";
@@ -383,6 +384,45 @@ export const useUpdateContract = () => {
 
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to update contract"));
+    },
+  });
+};
+
+export const useProjectUpdateContract = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ProjectUpdatePayload }) =>
+      contractService.projectUpdate(id, data),
+    onSuccess: async (data, variables) => {
+      try {
+        await syncProjectStatus(data.projectId);
+      } catch (error) {
+        console.error("Failed to sync project status after contract completion:", error);
+        toast.error(
+          "Contract completed, but the related project status could not be refreshed."
+        );
+      }
+
+      toast.success(
+        data.completionCode
+          ? `Contract completed. Completion code: ${data.completionCode}`
+          : "Contract completed successfully!"
+      );
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: CONTRACT_KEYS.detail(variables.id),
+        }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
+        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
+      ]);
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to complete contract"));
     },
   });
 };
