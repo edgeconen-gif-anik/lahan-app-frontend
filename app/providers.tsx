@@ -3,6 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { SessionIdleManager } from "@/components/auth/session-idle-manager";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // Create a client exactly once per application lifecycle
@@ -18,6 +19,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <SessionProvider>
+      <SessionIdleManager />
       <QueryClientProvider client={queryClient}>
         {children}
       </QueryClientProvider>

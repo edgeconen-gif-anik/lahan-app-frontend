@@ -1,6 +1,5 @@
 // types/next-auth.d.ts
-import NextAuth, { DefaultSession } from "next-auth";
-import { JWT } from "next-auth/jwt";
+import { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
   /**
@@ -13,6 +12,7 @@ declare module "next-auth" {
     } & DefaultSession["user"];
     accessToken?: string; // <--- The fix: Add this!
     error?: string;
+    sessionStartedAt?: number;
   }
 
   interface User {
@@ -29,5 +29,6 @@ declare module "next-auth/jwt" {
     role?: string;
     id?: string;
     error?: string;
+    sessionStartedAt?: number;
   }
 }

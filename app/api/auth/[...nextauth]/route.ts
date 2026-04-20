@@ -3,6 +3,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import axios from "axios";
 import { getGoogleOAuthConfig } from "@/lib/auth/google-auth";
+import {
+  SESSION_ABSOLUTE_TIMEOUT_SECONDS,
+  SESSION_IDLE_TIMEOUT_SECONDS,
+} from "@/lib/auth/session-config";
 
 const BACKEND_URL =
   process.env.BACKEND_URL ||
@@ -152,6 +156,17 @@ export const authOptions: NextAuthOptions = {
         token.accessToken = user.accessToken;
         token.id = user.id;
         token.role = user.role;
+        token.sessionStartedAt = Date.now();
+        token.error = undefined;
+      }
+
+      if (
+        token.sessionStartedAt &&
+        Date.now() - token.sessionStartedAt >=
+          SESSION_ABSOLUTE_TIMEOUT_SECONDS * 1000
+      ) {
+        token.accessToken = undefined;
+        token.error = "SessionMaxAgeExceeded";
       }
 
       return token;
@@ -160,6 +175,10 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (token) {
         session.accessToken = token.accessToken;
+        session.error = token.error;
+        if (token.sessionStartedAt) {
+          session.sessionStartedAt = token.sessionStartedAt;
+        }
         if (token.id) {
           session.user.id = token.id;
         }
@@ -175,6 +194,10 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+    maxAge: SESSION_IDLE_TIMEOUT_SECONDS,
+  },
+  jwt: {
+    maxAge: SESSION_IDLE_TIMEOUT_SECONDS,
   },
 };
 
