@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -18,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { toFormalNepaliDate } from "@/lib/date-utils";
+import { sanitizeTenDigitPhone, TEN_DIGIT_PHONE_LENGTH } from "@/lib/validation/phone";
 
 interface CompanyFormProps {
   defaultValues?: Partial<CompanyFormValues>;
@@ -29,6 +31,8 @@ interface CompanyFormProps {
 export function CompanyForm({ defaultValues, onSubmit, isLoading = false, buttonText }: CompanyFormProps) {
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
+    mode: "onTouched",
+    reValidateMode: "onChange",
     defaultValues: {
       name: "",
       address: "Lahan, Siraha",
@@ -64,6 +68,7 @@ export function CompanyForm({ defaultValues, onSubmit, isLoading = false, button
 
   const watchedRequestDate = form.watch("registrationRequestDate");
   const watchedRegDate = form.watch("registrationDate");
+  const watchedPhoneNumber = form.watch("phoneNumber");
 
   const formatDateForInput = (date: Date | undefined | null): string => {
     if (!date) return "";
@@ -127,11 +132,22 @@ export function CompanyForm({ defaultValues, onSubmit, isLoading = false, button
                   <FormControl>
                     <Input
                       placeholder="e.g. 123456789"
-                      maxLength={10} 
+                      maxLength={10}
                       {...field}
                       value={field.value ?? ""}
+                      onChange={(event) =>
+                        field.onChange(
+                          event.target.value
+                            .toUpperCase()
+                            .replace(/[^A-Z0-9]/g, "")
+                            .slice(0, 10)
+                        )
+                      }
                     />
                   </FormControl>
+                  <FormDescription className="text-xs">
+                    Enter either a 9-digit numeric PAN or the 10-character IRD PAN format.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -284,11 +300,23 @@ export function CompanyForm({ defaultValues, onSubmit, isLoading = false, button
                     <Input
                       type="tel"
                       placeholder="98xxxxxxxx"
-                      maxLength={10}
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      maxLength={TEN_DIGIT_PHONE_LENGTH}
+                      pattern="[0-9]*"
                       {...field}
                       value={field.value ?? ""}
+                      onChange={(event) =>
+                        field.onChange(sanitizeTenDigitPhone(event.target.value))
+                      }
                     />
                   </FormControl>
+                  <FormDescription className="flex items-center justify-between text-xs">
+                    <span>Numbers only. Mobile numbers must be exactly 10 digits.</span>
+                    <span className="font-medium">
+                      {(watchedPhoneNumber ?? "").length}/{TEN_DIGIT_PHONE_LENGTH}
+                    </span>
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

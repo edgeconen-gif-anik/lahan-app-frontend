@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ApprovalStatus } from "@/lib/schema/approval";
+import { TEN_DIGIT_PHONE_PATTERN } from "@/lib/validation/phone";
 
 export const CompanyCategoryEnum = z.enum(["WORKS", "SUPPLY", "CONSULTING", "OTHER"]);
 
@@ -13,10 +14,15 @@ export const companySchema = z.object({
   address: z.string().min(5, "Address is too short"),
   voucherNo: z.string().optional(),
   contactPerson: z.string().optional(),
-  phoneNumber: z.string()
-    .regex(/^\d{10}$/, "Must be a valid 10-digit mobile number")
-    .optional()
-    .or(z.literal("")),
+  phoneNumber: z
+    .union([
+      z.literal(""),
+      z.string().trim().regex(
+        TEN_DIGIT_PHONE_PATTERN,
+        "Mobile number must be exactly 10 digits"
+      ),
+    ])
+    .optional(),
   email: z.string()
     .email("Invalid email")
     .optional()
