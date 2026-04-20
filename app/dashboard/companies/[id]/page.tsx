@@ -8,6 +8,7 @@ import {
   getCompanyContractCount,
   getCompanyIsContracted,
 } from "@/lib/schema/company.schema";
+import { isApprovedStatus } from "@/lib/schema/approval";
 import { toFormalNepaliDate } from "@/lib/date-utils";
 import { 
   ArrowLeft, Building2, MapPin, Phone, Mail, User, Calendar, 
@@ -70,6 +71,7 @@ export default function CompanyViewPage() {
 
   const contractCount = getCompanyContractCount(company, companyContracts.length);
   const isContracted = getCompanyIsContracted(company, companyContracts.length);
+  const showCertificate = isApprovedStatus(company.approvalStatus);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-10">
@@ -109,12 +111,17 @@ export default function CompanyViewPage() {
               <Pencil className="h-4 w-4" /> Edit Profile
             </Button>
           </Link>
-          {/* ✅ Primary Action: View Certificate */}
-          <Link href={`/dashboard/companies/${company.id}/certificate`}>
-            <Button className="gap-2">
-              <FileBadge className="h-4 w-4" /> View Certificate
+          {showCertificate ? (
+            <Link href={`/dashboard/companies/${company.id}/certificate`}>
+              <Button className="gap-2">
+                <FileBadge className="h-4 w-4" /> View Certificate
+              </Button>
+            </Link>
+          ) : (
+            <Button className="gap-2" disabled>
+              <FileBadge className="h-4 w-4" /> Certificate After Approval
             </Button>
-          </Link>
+          )}
         </div>
       </div>
 

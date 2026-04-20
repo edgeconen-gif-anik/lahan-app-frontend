@@ -1,29 +1,39 @@
-// services\company\company.service.ts
 import api from "@/lib/api";
 import { Company, CompanyFormValues } from "@/lib/schema/company.schema";
 
+function normalizeCompanyListResponse(payload: unknown): Company[] {
+  if (Array.isArray(payload)) {
+    return payload as Company[];
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: Company[] }).data;
+  }
+
+  return [];
+}
+
 export const companyService = {
-  // 1. Get All (✅ Updated to accept params for searching & pagination)
-  getAll: async (params?: { search?: string; limit?: number; page?: number }) => {
-    // Note: Removed <Company[]> here to avoid strict type clashing if your backend 
-    // actually returns a paginated object like { data: Company[], meta: {} }
+  getAll: async (params?: { search?: string; limit?: number; page?: number }): Promise<Company[]> => {
     const { data } = await api.get("/companies", { params });
-    return data;
+    return normalizeCompanyListResponse(data);
   },
 
-  // 2. Get One
   getOne: async (id: string) => {
     const { data } = await api.get<Company>(`/companies/${id}`);
     return data;
   },
 
-  // 3. Create
   create: async (payload: CompanyFormValues) => {
     const { data } = await api.post<Company>("/companies", payload);
     return data;
   },
 
-  // 4. Update
   update: async ({ id, payload }: { id: string; payload: CompanyFormValues }) => {
     const { data } = await api.patch<Company>(`/companies/${id}`, payload);
     return data;
@@ -34,9 +44,8 @@ export const companyService = {
     return data;
   },
 
-  // 5. Delete
   delete: async (id: string) => {
     const { data } = await api.delete(`/companies/${id}`);
     return data;
-  }
+  },
 };

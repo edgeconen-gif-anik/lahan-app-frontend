@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useCompany } from '@/hooks/company/useCompany';
 import { toNepaliDate } from '@/lib/date-utils'; 
 import { categoryLabel } from '@/lib/category';
+import { isApprovedStatus } from '@/lib/schema/approval';
 import { FaPrint, FaSpinner } from 'react-icons/fa';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -33,14 +33,10 @@ export default function CompanyCertificatePage() {
   const id = params.id as string;
   
   const { data: company, isLoading, isError } = useCompany(id);
-  
-  const [verificationUrl, setVerificationUrl] = useState("");
-
-  useEffect(() => {
-    if (company?.id) {
-      setVerificationUrl(`${window.location.origin}/dashboard/companies/${company.id}`);
-    }
-  }, [company]);
+  const verificationUrl =
+    typeof window !== "undefined" && company?.id
+      ? `${window.location.origin}/dashboard/companies/${company.id}`
+      : "";
 
   const handlePrint = () => {
     window.print();
@@ -61,6 +57,17 @@ export default function CompanyCertificatePage() {
         <p>Failed to load company details or company not found.</p>
         <Link href="/dashboard/companies">
           <Button variant="outline">Return to Companies</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!isApprovedStatus(company.approvalStatus)) {
+    return (
+      <div className="text-center text-lg mt-20 space-y-4">
+        <p>Certificate is available only after the company has been approved.</p>
+        <Link href={`/dashboard/companies/${company.id}`}>
+          <Button variant="outline">Back to Company Profile</Button>
         </Link>
       </div>
     );

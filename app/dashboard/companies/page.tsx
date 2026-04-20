@@ -161,6 +161,12 @@ export default function CompanyListPage() {
       });
   }, [companies, search, categoryFilter, contractFilter, sortBy, contractCountsByCompany]);
 
+  const getAvailabilityBadgeLabel = (approvalStatus: string) => {
+    if (approvalStatus === "PENDING") return "Awaiting approval";
+    if (approvalStatus === "REJECTED") return "Not approved";
+    return "Not available for contracts";
+  };
+
   return (
     <div className="space-y-6">
 
@@ -349,7 +355,7 @@ export default function CompanyListPage() {
                         )
                       ) : (
                         <Badge variant="outline">
-                          Hidden from general users
+                          {getAvailabilityBadgeLabel(company.approvalStatus)}
                         </Badge>
                       )}
                     </div>
@@ -387,12 +393,19 @@ export default function CompanyListPage() {
                           </DropdownMenuItem>
                         </Link>
 
-                        <Link href={`/dashboard/companies/${company.id}/certificate`}>
-                          <DropdownMenuItem>
+                        {isApprovedStatus(company.approvalStatus) ? (
+                          <Link href={`/dashboard/companies/${company.id}/certificate`}>
+                            <DropdownMenuItem>
+                              <FileBadge className="mr-2 h-4 w-4" />
+                              Certificate
+                            </DropdownMenuItem>
+                          </Link>
+                        ) : (
+                          <DropdownMenuItem disabled>
                             <FileBadge className="mr-2 h-4 w-4" />
-                            Certificate
+                            Certificate After Approval
                           </DropdownMenuItem>
-                        </Link>
+                        )}
 
                         <Link href={`/dashboard/companies/${company.id}/edit`}>
                           <DropdownMenuItem>
