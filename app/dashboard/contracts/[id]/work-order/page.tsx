@@ -1,28 +1,68 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { PrintableContractDocument } from "@/components/contracts/printable-document";
+import { NepaliOfficialDocument } from "@/components/contracts/nepali-official-document";
+import { useCompany } from "@/hooks/company/useCompany";
 import { useContract } from "@/hooks/contract/useContracts";
+import { useProject } from "@/hooks/project/useProjects";
+import { useUserCommittee } from "@/hooks/user-committee/useUserCommittees";
 import {
-  buildWorkOrderDraftFromContract,
-  buildWorkOrderNarrative,
-  formatContractCurrency,
-  getContractDocumentVariant,
-  getDocumentSignatoryLabel,
-  hasCustomDocumentText,
-} from "@/lib/contract-documents";
-import { toFormalNepaliDate, toNepaliDate } from "@/lib/date-utils";
+  buildRecipientLines,
+  buildWorkOrderNepaliParagraphs,
+  formatNepaliDate,
+  getCustomWorkOrderNote,
+} from "@/lib/contract-document-nepali";
+
+function getDesignationLabel(designation?: string | null) {
+  switch (designation) {
+    case "ASSISTANT_SUB_ENGINEER":
+      return "अ. सब-इन्जिनियर";
+    case "SUB_ENGINEER":
+      return "सब-इन्जिनियर";
+    case "ENGINEER":
+      return "इन्जिनियर";
+    default:
+      return "";
+  }
+}
+
+function UnavailableState() {
+  return (
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] px-4 py-8">
+      <div className="mx-auto max-w-3xl rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+          Work order unavailable
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          The work-order document could not be generated because the contract details
+          could not be loaded.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function splitWorkOrderContent(value: string) {
+  return value
+    .split(/\r?\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+}
 
 export default function WorkOrderPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const contractId = params.id as string;
   const autoPrint = searchParams.get("print") === "1";
+
   const { data: contract, isLoading, error } = useContract(contractId);
+  const { data: company } = useCompany(contract?.companyId ?? "");
+  const { data: committee } = useUserCommittee(contract?.userCommitteeId ?? "");
+  const { data: project } = useProject(contract?.projectId ?? "");
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,#f7f4ea_0%,#eef3f8_100%)] px-4 py-8">
+      <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] px-4 py-8">
         <div className="mx-auto max-w-5xl space-y-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
@@ -35,80 +75,81 @@ export default function WorkOrderPage() {
     );
   }
 
-  if (error || !contract || !contract.workOrder) {
-    return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,#f7f4ea_0%,#eef3f8_100%)] px-4 py-8">
-        <div className="mx-auto max-w-3xl rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="font-serif text-3xl text-slate-900">Work order unavailable</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            This contract does not have an attached work order yet, or the work order
-            could not be loaded.
-          </p>
-        </div>
-      </div>
-    );
+  if (error || !contract) {
+    return <UnavailableState />;
   }
 
-  const variant = getContractDocumentVariant(contract);
-  const generatedWorkOrderText = buildWorkOrderDraftFromContract(contract);
-  const sections = [
+  const implementorAddress = company?.address ?? committee?.address;
+  const recipientLines = buildRecipientLines({
+    address: implementorAddress,
+    contract,
+  });
+  const fiscalYear = project?.fiscalYear ?? null;
+  const customWorkOrderContent = getCustomWorkOrderNote(contract);
+  const body = customWorkOrderContent
+    ? splitWorkOrderContent(customWorkOrderContent)
+    : buildWorkOrderNepaliParagraphs({
+        contract,
+        fiscalYear,
+        implementorAddress,
+        projectName: project?.name ?? contract.project?.name,
+      });
+  const workOrderDate = formatNepaliDate(
+    contract.workOrder?.issuedDate ?? contract.workOrder?.createdAt ?? contract.createdAt
+  );
+  const siteIncharge = contract.siteIncharge ?? contract.project?.siteIncharge ?? null;
+  const siteInchargeLabel = [getDesignationLabel(siteIncharge?.designation), siteIncharge?.name]
+    .filter(Boolean)
+    .join(" ");
+  const appendixSections = [
     {
-      title: "Work Authorization",
-      paragraphs: buildWorkOrderNarrative(contract),
+      title: "सादर अवगतार्थ:",
+      lines: [
+        "श्रीमान प्रमुखज्यू :- जानकारी निमित्त ।",
+        "श्रीमान उपप्रमुखज्यू :- जानकारी निमित्त ।",
+      ],
+    },
+    {
+      title: "बोधार्थ:-",
+      lines: [
+        "श्री आर्थिक प्रशासन शाखा :- जानकारी निमित्त ।",
+        "श्री पूर्वाधार शाखा :- जानकारी निमित्त ।",
+        `${siteInchargeLabel || "SITE INCHARGE"} लहान न.पा. नगरकार्यपालिकाको कार्यालय, लहान :- उक्त योजनाको रेखदेख र सुपरिवेक्षण गरी निर्धारित समयभित्र निर्माण कार्य सम्पन्न गर्न/गराउन हुन ।`,
+      ],
     },
   ];
 
-  if (hasCustomDocumentText(contract.workOrder.content, generatedWorkOrderText)) {
-    sections.push({
-      title: "Recorded Scope",
-      paragraphs: [contract.workOrder.content],
-    });
-  }
-
   return (
-    <PrintableContractDocument
+    <NepaliOfficialDocument
       autoPrint={autoPrint}
+      appendixSections={appendixSections}
       backHref={`/dashboard/contracts/${contract.id}`}
-      contract={contract}
-      documentType="work-order"
-      meta={[
-        {
-          label: "Issued Date",
-          value: toFormalNepaliDate(
-            contract.workOrder.issuedDate ?? contract.workOrder.createdAt
-          ),
-        },
-        {
-          label: "Work Completion Date",
-          value: toFormalNepaliDate(contract.workOrder.workCompletionDate),
-        },
-        { label: "Contract Value", value: formatContractCurrency(contract.contractAmount) },
-        { label: "Start Date (BS)", value: toNepaliDate(contract.startDate) },
-      ]}
-      sections={sections}
+      body={body}
+      contentWidth="narrow"
+      cornerMeta={{ label: "मिति", value: workOrderDate }}
+      density="compact"
+      headingLayout="subject-line"
+      letterhead
+      meta={[]}
+      printBottomReserveMm={45}
+      printTopShiftMm={28}
+      qrCodeLabel=""
+      qrCodePlacement="below-corner"
+      qrCodePath={`/dashboard/contracts/${contract.id}/work-order`}
+      recipientLines={recipientLines}
+      signatureLayout="bottom-right"
+      signatureNamePlacement="below"
       signatures={[
         {
-          label: "Office Signatory",
-          name: contract.workOrder.officeSignatory,
-          note: "Order issued by the Municipality",
-        },
-        {
-          label: getDocumentSignatoryLabel(variant),
-          name: contract.workOrder.contractorSignatory,
-          note:
-            variant === "USER_COMMITTEE"
-              ? "Committee receipt and acknowledgement"
-              : "Contractor receipt and acknowledgement",
-        },
-        {
-          label: "Witness",
-          name: contract.workOrder.witnessName,
-          note: "Witness to the issuance",
+          label: "प्रमुख प्रशासकिय अधिकत",
+          name: contract.workOrder?.officeSignatory,
+          showPlaceholderWhenNameMissing: false,
         },
       ]}
-      subtitle="Auto-generated work order based on the linked contract timeline, approved amount, and recorded signatories."
-      title="Work Order Document"
-      variant={variant}
+      subject="कार्य आदेश।"
+      subjectAlignment="center"
+      subjectPrefix="बिषय:-"
+      title=""
     />
   );
 }

@@ -85,9 +85,11 @@ export const useApproveUserCommittee = () => {
 
   return useMutation({
     mutationFn: (id: string) => userCommitteeService.approve(id),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("User Committee approved");
-      queryClient.invalidateQueries({ queryKey: ["userCommittees"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["userCommittees"] }),
+      ]);
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to approve User Committee"));

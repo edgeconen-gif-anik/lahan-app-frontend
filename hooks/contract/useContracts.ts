@@ -112,12 +112,18 @@ function resolveNextContractNumber(
 ) {
   const patterns = buildContractNumberPatterns(contracts);
   const serverParsed = parseContractNumber(serverData?.contractNumber);
-  const fallbackPattern = pickFallbackPattern(patterns, serverParsed?.prefix);
   const serverSequence = serverData?.sequence ?? serverParsed?.sequence ?? 0;
 
-  if (serverParsed && fallbackPattern?.prefix === serverParsed.prefix) {
-    const nextSequence = Math.max(serverSequence, fallbackPattern.maxSequence + 1);
-    const width = Math.max(serverParsed.width, fallbackPattern.width);
+  if (serverParsed) {
+    const matchingPattern = patterns.find(
+      (pattern) => pattern.prefix === serverParsed.prefix
+    );
+    const nextSequence = matchingPattern
+      ? Math.max(serverSequence, matchingPattern.maxSequence + 1)
+      : serverSequence;
+    const width = matchingPattern
+      ? Math.max(serverParsed.width, matchingPattern.width)
+      : serverParsed.width;
 
     return {
       contractNumber: formatContractNumber(serverParsed.prefix, width, nextSequence),
@@ -131,24 +137,6 @@ function resolveNextContractNumber(
   }
 
   if (serverData?.contractNumber) {
-    if (fallbackPattern && serverSequence > 0 && serverSequence <= fallbackPattern.maxSequence) {
-      const nextSequence = fallbackPattern.maxSequence + 1;
-
-      return {
-        contractNumber: formatContractNumber(
-          fallbackPattern.prefix,
-          fallbackPattern.width,
-          nextSequence
-        ),
-        sequence: nextSequence,
-        source: "local",
-      } satisfies {
-        contractNumber: string;
-        sequence: number;
-        source: ContractNumberSource;
-      };
-    }
-
     return {
       contractNumber: serverData.contractNumber,
       sequence: serverSequence,
@@ -159,6 +147,8 @@ function resolveNextContractNumber(
       source: ContractNumberSource;
     };
   }
+
+  const fallbackPattern = pickFallbackPattern(patterns);
 
   if (fallbackPattern) {
     const nextSequence = fallbackPattern.maxSequence + 1;
@@ -197,7 +187,9 @@ export const CONTRACT_KEYS = {
   list:       (p?: ContractListParams) => [...CONTRACT_KEYS.lists(), p] as const,
   details:    ()            => [...CONTRACT_KEYS.all, "detail"]        as const,
   detail:     (id: string)  => [...CONTRACT_KEYS.details(), id]        as const,
-  nextNumber: ()            => [...CONTRACT_KEYS.all, "next-number"]   as const,
+  nextNumbers: ()           => [...CONTRACT_KEYS.all, "next-number"]   as const,
+  nextNumber: (projectId?: string) =>
+    [...CONTRACT_KEYS.nextNumbers(), projectId ?? null] as const,
 };
 
 const COMPANY_QUERY_KEY = ["companies"] as const;
@@ -239,15 +231,15 @@ export const useContract = (id: string) => {
  * Fetches the next suggested sequential contract number from the server.
  * staleTime/gcTime = 0: never serve a cached number — it changes after every create/delete.
  */
-export const useNextContractNumber = () => {
+export const useNextContractNumber = (projectId?: string) => {
   const {
     data,
     isLoading: isLoadingServerNumber,
     isError: isServerNumberError,
     refetch: refetchServerNumber,
   } = useQuery({
-    queryKey: CONTRACT_KEYS.nextNumber(),
-    queryFn:  contractService.getNextNumber,
+    queryKey: CONTRACT_KEYS.nextNumber(projectId),
+    queryFn:  () => contractService.getNextNumber({ projectId }),
     staleTime: 0,
     gcTime:    0,
     retry:     false,
@@ -306,7 +298,7 @@ export const useCreateContract = () => {
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumber() }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumbers() }),
       ]);
 
       router.push(
@@ -375,6 +367,7 @@ export const useUpdateContract = () => {
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumbers() }),
       ]);
 
       if (!isApproved) {
@@ -477,7 +470,7 @@ export const useDeleteContract = () => {
       toast.success("Contract deleted successfully!");
       queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() });
       queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumber() });
+      queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumbers() });
       router.push("/dashboard/contracts");
     },
 
@@ -503,6 +496,7 @@ export const useApproveContract = () => {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.details() }),
         queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),

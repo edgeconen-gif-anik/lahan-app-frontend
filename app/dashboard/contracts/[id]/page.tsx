@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, Edit, FileText, ClipboardList, CheckSquare,
@@ -9,7 +10,8 @@ import {
   ChevronDown, Pencil, Ban, Printer,
   CalendarDays, TrendingUp, Archive,
 } from "lucide-react";
-import { useContract, useUpdateContract } from "@/hooks/contract/useContracts";
+import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { useApproveContract, useContract, useUpdateContract } from "@/hooks/contract/useContracts";
 import type { UpdateContractPayload } from "@/lib/schema/contract/contract";
 import {
   buildAgreementDraftFromContract,
@@ -624,6 +626,9 @@ export default function ContractDetailPage() {
   const router  = useRouter();
   const { id }  = useParams();
   const [localStatus, setLocalStatus] = useState<ContractStatus | undefined>(undefined);
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
+  const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
 
   const { data: contract, isLoading, error } = useContract(id as string);
 
@@ -655,18 +660,17 @@ export default function ContractDetailPage() {
   };
   const documentVariant = getContractDocumentVariant(contract);
   const documentPartyLabel = getDocumentPartyLabel(documentVariant);
-  const agreementDraftText = contract.agreement
-    ? buildAgreementDraftFromContract(contract)
-    : "";
-  const workOrderDraftText = contract.workOrder
-    ? buildWorkOrderDraftFromContract(contract)
-    : "";
+  const agreementDraftText = buildAgreementDraftFromContract(contract);
+  const workOrderDraftText = buildWorkOrderDraftFromContract(contract);
   const agreementHasCustomText = contract.agreement
     ? hasCustomDocumentText(contract.agreement.content, agreementDraftText)
     : false;
   const workOrderHasCustomText = contract.workOrder
     ? hasCustomDocumentText(contract.workOrder.content, workOrderDraftText)
     : false;
+  const agreementAmount = contract.agreement?.amount ?? contract.contractAmount;
+  const workOrderCompletionDate =
+    contract.workOrder?.workCompletionDate ?? contract.intendedCompletionDate;
 
   const implementor = contract.company
     ? { type: "company"   as const, name: contract.company.name, sub: contract.company.panNumber ? `PAN: ${contract.company.panNumber}` : undefined }
@@ -690,6 +694,7 @@ export default function ContractDetailPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold tracking-tight">Contract Details</h1>
               <StatusBadge status={displayStatus} />
+              <ApprovalStatusBadge status={contract.approvalStatus} />
               <TimeHealthBadge health={health} />
             </div>
             <p className="text-sm text-muted-foreground font-mono mt-0.5">
@@ -700,24 +705,20 @@ export default function ContractDetailPage() {
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          {contract.agreement && (
-            <button
-              onClick={() => router.push(`/dashboard/contracts/${id}/agreement`)}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
-            >
-              <FileText size={13} />
-              Agreement
-            </button>
-          )}
-          {contract.workOrder && (
-            <button
-              onClick={() => router.push(`/dashboard/contracts/${id}/work-order`)}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
-            >
-              <ClipboardList size={13} />
-              Work Order
-            </button>
-          )}
+          <button
+            onClick={() => router.push(`/dashboard/contracts/${id}/agreement`)}
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <FileText size={13} />
+            Agreement Page
+          </button>
+          <button
+            onClick={() => router.push(`/dashboard/contracts/${id}/work-order`)}
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <ClipboardList size={13} />
+            Work-Order Page
+          </button>
           <button
             onClick={() => router.push(`/dashboard/contracts/${id}/contract-update`)}
             className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
@@ -797,6 +798,49 @@ export default function ContractDetailPage() {
       </Section>
 
       {/* ── Project ── */}
+      <Section title="Approval" icon={<BadgeCheck size={16} />}>
+        <InfoRow
+          label="Approval Status"
+          value={<ApprovalStatusBadge status={contract.approvalStatus} />}
+        />
+        <InfoRow
+          label="Approved At"
+          value={
+            contract.approvedAt
+              ? formatBsDate(contract.approvedAt)
+              : <span className="text-muted-foreground italic text-xs">Not approved yet</span>
+          }
+        />
+        {isAdmin && (
+          <div className="mt-3 border-t pt-3">
+            {contract.approvalStatus !== "APPROVED" ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => approveContract(contract.id)}
+                  disabled={isApprovingContract}
+                  className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-60"
+                >
+                  {isApprovingContract ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={14} />
+                  )}
+                  Approve Contract
+                </button>
+                <p className="text-xs text-muted-foreground">
+                  Approve this contract to unlock admin milestone and status progression.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                This contract has already been approved.
+              </p>
+            )}
+          </div>
+        )}
+      </Section>
+
       {contract.project && (
         <Section title="Project" icon={<FileText size={16} />}>
           <InfoRow label="Name" value={contract.project.name} />
@@ -852,55 +896,23 @@ export default function ContractDetailPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <DocumentActionCard
             accent="blue"
-            available={!!contract.agreement}
-            detail={
-              contract.agreement
-                ? `${documentPartyLabel} agreement ready to open or print directly from this page.`
-                : "Attach an agreement to unlock the printable agreement document."
-            }
+            available
+            detail={`${documentPartyLabel} agreement page is generated directly from the live contract details and is ready to open or print.`}
             icon={<FileText size={18} />}
-            meta={
-              contract.agreement
-                ? `${agreementHasCustomText ? "Custom recorded terms" : "Auto-generated terms"} | Amount: ${formatContractCurrency(contract.agreement.amount)}`
-                : "Agreement document is not available yet."
-            }
-            onOpen={
-              contract.agreement
-                ? () => router.push(`/dashboard/contracts/${id}/agreement`)
-                : undefined
-            }
-            onPrint={
-              contract.agreement
-                ? () => openDocumentPrint(`/dashboard/contracts/${id}/agreement`)
-                : undefined
-            }
+            meta={`${agreementHasCustomText ? "Custom recorded terms" : "Auto-generated terms"} | Amount: ${formatContractCurrency(agreementAmount)}`}
+            onOpen={() => router.push(`/dashboard/contracts/${id}/agreement`)}
+            onPrint={() => openDocumentPrint(`/dashboard/contracts/${id}/agreement`)}
             title="Agreement Document"
           />
 
           <DocumentActionCard
             accent="violet"
-            available={!!contract.workOrder}
-            detail={
-              contract.workOrder
-                ? `${documentPartyLabel} work order ready to open, print, and share for execution.`
-                : "Attach a work order to unlock the standard printable work order."
-            }
+            available
+            detail={`${documentPartyLabel} work-order page is generated directly from the live contract details and is ready to open, print, and share.`}
             icon={<ClipboardList size={18} />}
-            meta={
-              contract.workOrder
-                ? `${workOrderHasCustomText ? "Custom recorded scope" : "Auto-generated scope"} | Completion target: ${formatBsDate(contract.workOrder.workCompletionDate)}`
-                : "Work order document is not available yet."
-            }
-            onOpen={
-              contract.workOrder
-                ? () => router.push(`/dashboard/contracts/${id}/work-order`)
-                : undefined
-            }
-            onPrint={
-              contract.workOrder
-                ? () => openDocumentPrint(`/dashboard/contracts/${id}/work-order`)
-                : undefined
-            }
+            meta={`${workOrderHasCustomText ? "Custom recorded scope" : "Auto-generated scope"} | Completion target: ${formatBsDate(workOrderCompletionDate)}`}
+            onOpen={() => router.push(`/dashboard/contracts/${id}/work-order`)}
+            onPrint={() => openDocumentPrint(`/dashboard/contracts/${id}/work-order`)}
             title="Work Order Document"
           />
         </div>
@@ -908,97 +920,125 @@ export default function ContractDetailPage() {
 
       {/* ── Agreement ── */}
       <Section
-        title={contract.agreement ? "Agreement" : "Agreement — Not Attached"}
+        title="Agreement"
         icon={<ClipboardList size={16} />}
-        collapsible={!!contract.agreement}
+        collapsible
       >
-        {contract.agreement ? (
-          <>
-            <InfoRow label="Agreement Date (BS)" value={formatBsDate(contract.agreement.agreementDate)} />
-            <InfoRow label="Amount" value={formatCurrency(contract.agreement.amount)} accent />
+        <>
+            <InfoRow label="Agreement Date (BS)" value={formatBsDate(contract.agreement?.agreementDate ?? contract.startDate)} />
+            <InfoRow label="Amount" value={formatCurrency(agreementAmount)} accent />
             <InfoRow
               label="Text Source"
               value={agreementHasCustomText ? "Custom recorded terms" : "Auto-generated from contract details"}
             />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(`/dashboard/contracts/${id}/agreement`)}
+                className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              >
+                <FileText size={14} />
+                Open Agreement Page
+              </button>
+              <button
+                type="button"
+                onClick={() => openDocumentPrint(`/dashboard/contracts/${id}/agreement`)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+              >
+                <Printer size={14} />
+                Print Agreement
+              </button>
+            </div>
             <div className="mt-3 border-t pt-3">
               <DocumentTextBlock
                 title="Printable Summary"
                 text={agreementDraftText}
               />
-              {agreementHasCustomText && (
+              {agreementHasCustomText && contract.agreement && (
                 <DocumentTextBlock
                   title="Recorded Terms"
                   text={contract.agreement.content}
                 />
               )}
             </div>
-            {(contract.agreement.officeSignatory || contract.agreement.contractorSignatory || contract.agreement.witnessName) && (
+            {(contract.agreement?.officeSignatory || contract.agreement?.contractorSignatory || contract.agreement?.witnessName) && (
               <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {contract.agreement.officeSignatory && (
+                {contract.agreement?.officeSignatory && (
                   <SignatoryCard role="Office Signatory" name={contract.agreement.officeSignatory} />
                 )}
-                {contract.agreement.contractorSignatory && (
+                {contract.agreement?.contractorSignatory && (
                   <SignatoryCard
                     role={getDocumentSignatoryLabel(documentVariant)}
                     name={contract.agreement.contractorSignatory}
                   />
                 )}
-                {contract.agreement.witnessName && (
+                {contract.agreement?.witnessName && (
                   <SignatoryCard role="Witness" name={contract.agreement.witnessName} />
                 )}
               </div>
             )}
           </>
-        ) : (
-          <p className="text-sm text-muted-foreground italic py-1">No agreement attached to this contract.</p>
-        )}
       </Section>
 
       {/* ── Work Order ── */}
       <Section
-        title={contract.workOrder ? "Work Order" : "Work Order — Not Attached"}
+        title="Work Order"
         icon={<CheckSquare size={16} />}
-        collapsible={!!contract.workOrder}
+        collapsible
       >
-        {contract.workOrder ? (
-          <>
-            <InfoRow label="Work Completion Date (BS)" value={formatBsDate(contract.workOrder.workCompletionDate)} />
+        <>
+            <InfoRow label="Work Completion Date (BS)" value={formatBsDate(workOrderCompletionDate)} />
             <InfoRow
               label="Text Source"
               value={workOrderHasCustomText ? "Custom recorded scope" : "Auto-generated from contract details"}
             />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(`/dashboard/contracts/${id}/work-order`)}
+                className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              >
+                <ClipboardList size={14} />
+                Open Work-Order Page
+              </button>
+              <button
+                type="button"
+                onClick={() => openDocumentPrint(`/dashboard/contracts/${id}/work-order`)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+              >
+                <Printer size={14} />
+                Print Work Order
+              </button>
+            </div>
             <div className="mt-3 border-t pt-3">
               <DocumentTextBlock
                 title="Printable Summary"
                 text={workOrderDraftText}
               />
-              {workOrderHasCustomText && (
+              {workOrderHasCustomText && contract.workOrder && (
                 <DocumentTextBlock
                   title="Recorded Scope"
                   text={contract.workOrder.content}
                 />
               )}
             </div>
-            {(contract.workOrder.officeSignatory || contract.workOrder.contractorSignatory || contract.workOrder.witnessName) && (
+            {(contract.workOrder?.officeSignatory || contract.workOrder?.contractorSignatory || contract.workOrder?.witnessName) && (
               <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {contract.workOrder.officeSignatory && (
+                {contract.workOrder?.officeSignatory && (
                   <SignatoryCard role="Office Signatory" name={contract.workOrder.officeSignatory} />
                 )}
-                {contract.workOrder.contractorSignatory && (
+                {contract.workOrder?.contractorSignatory && (
                   <SignatoryCard
                     role={getDocumentSignatoryLabel(documentVariant)}
                     name={contract.workOrder.contractorSignatory}
                   />
                 )}
-                {contract.workOrder.witnessName && (
+                {contract.workOrder?.witnessName && (
                   <SignatoryCard role="Witness" name={contract.workOrder.witnessName} />
                 )}
               </div>
             )}
           </>
-        ) : (
-          <p className="text-sm text-muted-foreground italic py-1">No work order attached to this contract.</p>
-        )}
       </Section>
 
       {/* ── Metadata ── */}

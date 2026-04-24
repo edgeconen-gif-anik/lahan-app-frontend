@@ -1158,13 +1158,14 @@ export default function NewContractPage() {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
   const { mutateAsync: createContract, isPending } = useCreateContract();
+  const [formData, setFormData] = useState<ContractFormData>(INITIAL_FORM_DATA);
 
   const {
     contractNumber: serverContractNumber,
     source: contractNumberSource,
     isLoading: isLoadingContractNumber,
     refetch: refetchContractNumber,
-  } = useNextContractNumber();
+  } = useNextContractNumber(formData.projectId || undefined);
 
   const [projectSearch, setProjectSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
@@ -1176,7 +1177,6 @@ export default function NewContractPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
   const [didAttemptSubmit, setDidAttemptSubmit] = useState(false);
-  const [formData, setFormData] = useState<ContractFormData>(INITIAL_FORM_DATA);
 
   const debouncedProjectSearch = useDebounce(projectSearch, 350);
   const debouncedUserSearch = useDebounce(userSearch, 350);

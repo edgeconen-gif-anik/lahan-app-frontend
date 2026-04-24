@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
   Card,
@@ -11,8 +12,10 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import {
   ArrowLeft,
+  CheckCircle2,
   Edit,
   Loader2,
   User,
@@ -27,6 +30,7 @@ import {
 
 import { toFormalNepaliDate } from "@/lib/date-utils";
 import {
+  useApproveUserCommittee,
   useUserCommittee,
   useDeleteUserCommittee,
 } from "@/hooks/user-committee/useUserCommittees";
@@ -35,8 +39,12 @@ export default function CommitteeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
 
   const { data: committee, isLoading } = useUserCommittee(id);
+  const { mutate: approveCommittee, isPending: isApproving } =
+    useApproveUserCommittee();
   const { mutate: deleteCommittee, isPending: isDeleting } =
     useDeleteUserCommittee();
 
@@ -86,9 +94,12 @@ export default function CommitteeDetailPage() {
             </Button>
           </Link>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">
-              {committee.name}
-            </h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-3xl font-bold tracking-tight">
+                {committee.name}
+              </h2>
+              <ApprovalStatusBadge status={committee.approvalStatus} />
+            </div>
             <p className="text-muted-foreground">
               उपभोक्ता समितिको विवरण
             </p>
@@ -96,6 +107,21 @@ export default function CommitteeDetailPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {isAdmin && committee.approvalStatus !== "APPROVED" && (
+            <Button
+              variant="outline"
+              onClick={() => approveCommittee(committee.id)}
+              disabled={isApproving}
+            >
+              {isApproving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              {isApproving ? "Approving..." : "Approve"}
+            </Button>
+          )}
+
           <Button
             variant="destructive"
             onClick={handleDelete}
@@ -127,6 +153,32 @@ export default function CommitteeDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-4 w-4 mt-1 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">
+                    Approval Status
+                  </p>
+                  <div className="mt-1">
+                    <ApprovalStatusBadge status={committee.approvalStatus} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Calendar className="h-4 w-4 mt-1 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">
+                    Approved Date
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {committee.approvedAt
+                      ? toFormalNepaliDate(committee.approvedAt)
+                      : "Not approved yet"}
+                  </p>
+                </div>
+              </div>
+
               <div className="flex items-start gap-3">
                 <MapPin className="h-4 w-4 mt-1 text-muted-foreground" />
                 <div>
@@ -215,7 +267,7 @@ export default function CommitteeDetailPage() {
               {committee.officials?.length ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {committee.officials.map(
-                    (official: any) => (
+                    (official) => (
                       <div
                         key={official.id}
                         className="flex flex-col p-4 border rounded-lg bg-card shadow-sm space-y-3"

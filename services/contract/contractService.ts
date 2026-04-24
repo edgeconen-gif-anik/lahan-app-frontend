@@ -29,8 +29,12 @@ export const contractService = {
     return data;
   },
 
-  getNextNumber: async (): Promise<NextContractNumberResponse> => {
-    const { data } = await api.get<NextContractNumberResponse>("/contracts/next-number");
+  getNextNumber: async (params?: {
+    projectId?: string;
+  }): Promise<NextContractNumberResponse> => {
+    const { data } = await api.get<NextContractNumberResponse>("/contracts/next-number", {
+      params,
+    });
     return data;
   },
 
