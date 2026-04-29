@@ -95,7 +95,7 @@ export default function WorkOrderPage() {
         projectName: project?.name ?? contract.project?.name,
       });
   const workOrderDate = formatNepaliDate(
-    contract.workOrder?.issuedDate ?? contract.workOrder?.createdAt ?? contract.createdAt
+    contract.agreement?.agreementDate ?? contract.startDate
   );
   const siteIncharge = contract.siteIncharge ?? contract.project?.siteIncharge ?? null;
   const siteInchargeLabel = [getDesignationLabel(siteIncharge?.designation), siteIncharge?.name]
