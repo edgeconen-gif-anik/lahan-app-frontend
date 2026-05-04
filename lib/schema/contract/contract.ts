@@ -43,6 +43,7 @@ export const ContractProjectSchema = z.object({
   id:   z.string(),
   name: z.string(),
   sNo:  z.string().nullable().optional(),
+  fiscalYear: z.string().nullable().optional(),
   // ✅ siteIncharge on the project (inherited)
   siteIncharge: EmbeddedUserSchema.nullable().optional(),
 });

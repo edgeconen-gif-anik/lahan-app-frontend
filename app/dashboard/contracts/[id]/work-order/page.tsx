@@ -12,6 +12,7 @@ import {
   formatNepaliDate,
   getCustomWorkOrderNote,
 } from "@/lib/contract-document-nepali";
+import { useSystemSetup } from "@/hooks/setup/useSetup";
 
 function getDesignationLabel(designation?: string | null) {
   switch (designation) {
@@ -59,6 +60,7 @@ export default function WorkOrderPage() {
   const { data: company } = useCompany(contract?.companyId ?? "");
   const { data: committee } = useUserCommittee(contract?.userCommitteeId ?? "");
   const { data: project } = useProject(contract?.projectId ?? "");
+  const { data: setup } = useSystemSetup();
 
   if (isLoading) {
     return (
@@ -101,6 +103,11 @@ export default function WorkOrderPage() {
   const siteInchargeLabel = [getDesignationLabel(siteIncharge?.designation), siteIncharge?.name]
     .filter(Boolean)
     .join(" ");
+  const chiefAdministrativeOfficerName =
+    contract.workOrder?.officeSignatory?.trim() ||
+    setup?.chiefAdministrativeOfficerName?.trim();
+  const sectionChiefName =
+    contract.workOrder?.witnessName?.trim() || setup?.sectionChiefName?.trim();
   const appendixSections = [
     {
       title: "सादर अवगतार्थ:",
@@ -141,8 +148,9 @@ export default function WorkOrderPage() {
       signatureNamePlacement="below"
       signatures={[
         {
-          label: "प्रमुख प्रशासकिय अधिकत",
-          name: contract.workOrder?.officeSignatory,
+          label: "प्रमुख प्रशासकिय अधिकृत",
+          name: chiefAdministrativeOfficerName,
+          note: sectionChiefName ? `शाखा प्रमुख: ${sectionChiefName}` : undefined,
           showPlaceholderWhenNameMissing: false,
         },
       ]}

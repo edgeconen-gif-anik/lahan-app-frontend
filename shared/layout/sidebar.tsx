@@ -9,7 +9,8 @@ import {
   FolderKanban, 
   FileSignature, 
   Users, 
-  Building2 
+  Building2,
+  Settings,
 } from "lucide-react";
 
 const sidebarItems = [
@@ -18,7 +19,8 @@ const sidebarItems = [
   { icon: FileSignature, label: "Contracts", href: "/dashboard/contracts" },
   { icon: Users, label: "Committees", href: "/dashboard/committees" },
   { icon: Building2, label: "Companies", href: "/dashboard/companies" },
-  { icon: Users, label: "Users", href: "/dashboard/users" },
+  { icon: Users, label: "Users", href: "/dashboard/users", adminOnly: true },
+  { icon: Settings, label: "Setup", href: "/dashboard/setup", adminOnly: true },
 ];
 
 type SidebarProps = React.HTMLAttributes<HTMLDivElement>;
@@ -29,7 +31,7 @@ export function Sidebar({ className }: SidebarProps) {
   const isAdmin = session?.user?.role === "ADMIN";
   const visibleItems = isAdmin
     ? sidebarItems
-    : sidebarItems.filter((item) => item.href !== "/dashboard/users");
+    : sidebarItems.filter((item) => !item.adminOnly);
 
   return (
     <div className={cn("pb-12 h-full bg-slate-50 dark:bg-slate-950 border-r", className)}>

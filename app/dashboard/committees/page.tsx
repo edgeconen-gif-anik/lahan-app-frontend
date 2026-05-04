@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import { CheckCircle2, Eye, Plus, Search, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
 
 const getOfficialDetails = (officials: CommitteeOfficial[], role: string) => {
   const official = officials?.find((o) => o.role === role);
@@ -34,7 +35,14 @@ export default function CommitteeLandingPage() {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
   const [search, setSearch] = useState("");
-  const { data: committeesData, isLoading } = useUserCommittees({ search });
+  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const { data: setup } = useSystemSetup();
+  const { data: fiscalYears = [] } = useFiscalYears();
+  const effectiveFiscalYear = fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
+  const { data: committeesData, isLoading } = useUserCommittees({
+    search,
+    fiscalYear: effectiveFiscalYear || undefined,
+  });
   const { mutate: approveCommittee, isPending: isApprovingCommittee } =
     useApproveUserCommittee();
 
@@ -58,7 +66,7 @@ export default function CommitteeLandingPage() {
         </Link>
       </div>
 
-      <div className="flex items-center bg-card p-4 rounded-lg border shadow-sm">
+      <div className="flex flex-col gap-3 bg-card p-4 rounded-lg border shadow-sm md:flex-row md:items-center">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -68,6 +76,19 @@ export default function CommitteeLandingPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <select
+          value={effectiveFiscalYear}
+          onChange={(event) => setFiscalYearFilter(event.target.value)}
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="">All Fiscal Years</option>
+          {fiscalYears.map((year) => (
+            <option key={year} value={year}>
+              {year}
+              {year === setup?.currentFiscalYear ? " (Current)" : ""}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="rounded-md border bg-card shadow-sm overflow-x-auto">

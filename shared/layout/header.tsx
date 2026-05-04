@@ -15,9 +15,11 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useSystemSetup } from "@/hooks/setup/useSetup";
 
 export function Header() {
   const { data: session } = useSession();
+  const { data: setup } = useSystemSetup();
 
   const userInitials = session?.user?.name
     ? session.user.name.slice(0, 2).toUpperCase()
@@ -39,8 +41,13 @@ export function Header() {
         </Sheet>
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      <div className="flex flex-1 justify-end pr-3">
+        {setup?.currentFiscalYear ? (
+          <div className="hidden rounded-md border bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:block">
+            FY {setup.currentFiscalYear}
+          </div>
+        ) : null}
+      </div>
 
       {/* User Profile Dropdown */}
       <DropdownMenu>

@@ -19,6 +19,8 @@ export const contractService = {
     companyId?: string;
     userCommitteeId?: string;
     userId?: string;
+    siteInchargeId?: string;
+    fiscalYear?: string;
   }): Promise<Contract[]> => {
     const { data } = await api.get<Contract[]>("/contracts", { params });
     return data;

@@ -31,7 +31,7 @@ export type CommitteeOfficialErrors = Partial<
   Record<"name" | "phoneNumber" | "citizenshipNumber", string>
 >;
 
-const FISCAL_YEAR_PATTERN = /^\d{4}\/\d{3}$/;
+const FISCAL_YEAR_PATTERN = /^\d{4}\s*[/-]\s*\d{2,3}$/;
 
 export function validateCommitteeForm(
   formData: CommitteeFormState,
@@ -48,7 +48,7 @@ export function validateCommitteeForm(
   }
 
   if (!FISCAL_YEAR_PATTERN.test(formData.fiscalYear.trim())) {
-    errors.fiscalYear = "Fiscal year must be in 2082/083 format.";
+    errors.fiscalYear = "Fiscal year must be in 2082/083 or 2082/83 format.";
   }
 
   if (!formData.formedDate) {

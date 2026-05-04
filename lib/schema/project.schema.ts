@@ -9,7 +9,7 @@ const baseProjectSchema = z.object({
   name: z.string().min(2, "Name is required"),
   type: z.string().min(1, "Type is required"), // e.g., "Road", "Building"
   budgetCode: z.string().min(1, "Budget Code is required"),
-  fiscalYear: z.string().regex(/^\d{4}\/\d{3}$/, "Format: 2080/081"),
+  fiscalYear: z.string().regex(/^\d{4}\s*[/-]\s*\d{2,3}$/, "Format: 2080/081 or 2080/81"),
   source: z.string().min(1, "Source is required"),
   
   allocatedBudget: z.coerce.number().min(1, "Budget must be greater than 0"),

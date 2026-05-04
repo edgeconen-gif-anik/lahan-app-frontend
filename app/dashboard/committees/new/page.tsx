@@ -28,6 +28,7 @@ import {
   validateCommitteeForm,
   validateCommitteeOfficials,
 } from "@/lib/validation/user-committee";
+import { useSystemSetup } from "@/hooks/setup/useSetup";
 
 type TouchedFieldMap = Partial<Record<keyof CommitteeFormState | "bsDate", boolean>>;
 type OfficialTouchedMap = Record<
@@ -38,7 +39,7 @@ type OfficialTouchedMap = Record<
 const INITIAL_FORM_DATA: CommitteeFormState = {
   name: "",
   address: "",
-  fiscalYear: "2082/083",
+  fiscalYear: "",
   formedDate: "",
   bankName: "",
   accountNumber: "",
@@ -67,6 +68,7 @@ function formatBsDateInput(value: string) {
 
 export default function RegisterCommitteePage() {
   const { mutate: createCommittee, isPending } = useCreateUserCommittee();
+  const { data: setup } = useSystemSetup();
 
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [bsDate, setBsDate] = useState("");
@@ -78,10 +80,17 @@ export default function RegisterCommitteePage() {
     createOfficial("SECRETARY"),
     createOfficial("TREASURER"),
   ]);
+  const effectiveFormData = useMemo(
+    () => ({
+      ...formData,
+      fiscalYear: formData.fiscalYear || setup?.currentFiscalYear || "",
+    }),
+    [formData, setup?.currentFiscalYear]
+  );
 
   const fieldErrors = useMemo(
-    () => validateCommitteeForm(formData, { requireBsDate: true, bsDate }),
-    [formData, bsDate]
+    () => validateCommitteeForm(effectiveFormData, { requireBsDate: true, bsDate }),
+    [effectiveFormData, bsDate]
   );
   const officialErrors = useMemo(
     () => validateCommitteeOfficials(officials),
@@ -176,7 +185,7 @@ export default function RegisterCommitteePage() {
     }
 
     createCommittee({
-      ...formData,
+      ...effectiveFormData,
       formedDate: new Date(formData.formedDate).toISOString(),
       officials: officials.map(({ id, ...official }) => official),
     });
@@ -247,7 +256,7 @@ export default function RegisterCommitteePage() {
                 id="fiscalYear"
                 name="fiscalYear"
                 placeholder="2082/083"
-                value={formData.fiscalYear}
+                value={effectiveFormData.fiscalYear}
                 onBlur={() => markFieldTouched("fiscalYear")}
                 onChange={handleInputChange}
                 aria-invalid={Boolean(getFieldError("fiscalYear"))}

@@ -14,6 +14,7 @@ import {
   toNepaliDigits,
 } from "@/lib/contract-document-nepali";
 import { getContractDocumentVariant } from "@/lib/contract-documents";
+import { useSystemSetup } from "@/hooks/setup/useSetup";
 
 const EMPLOYER_NAME =
   "लहान नगरपालिका, नगर कार्यपालिकाको कार्यालय, लहान, सिराहा";
@@ -62,6 +63,7 @@ export default function AgreementPage() {
   const { data: company } = useCompany(contract?.companyId ?? "");
   const { data: committee } = useUserCommittee(contract?.userCommitteeId ?? "");
   const { data: project } = useProject(contract?.projectId ?? "");
+  const { data: setup } = useSystemSetup();
 
   if (isLoading) {
     return (
@@ -108,6 +110,11 @@ export default function AgreementPage() {
     projectName,
   });
   const customNote = getCustomAgreementNote(contract);
+  const officeSignatory =
+    contract.agreement?.officeSignatory?.trim() ||
+    setup?.chiefAdministrativeOfficerName?.trim();
+  const witnessName =
+    contract.agreement?.witnessName?.trim() || setup?.sectionChiefName?.trim();
   const meta = [
     {
       label: "मिति",
@@ -142,7 +149,7 @@ export default function AgreementPage() {
       signatures={[
         {
           label: "नियोक्ताको तर्फबाट",
-          name: contract.agreement?.officeSignatory,
+          name: officeSignatory,
           note: EMPLOYER_NAME,
         },
         {
@@ -155,7 +162,7 @@ export default function AgreementPage() {
         },
         {
           label: "साक्षी",
-          name: contract.agreement?.witnessName,
+          name: witnessName,
           note: "सम्झौताको साक्षी",
         },
       ]}

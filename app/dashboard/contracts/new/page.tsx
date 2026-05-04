@@ -38,6 +38,7 @@ import {
   type ContractDocumentVariant,
 } from "@/lib/contract-documents";
 import { cn } from "@/lib/utils";
+import { useSystemSetup } from "@/hooks/setup/useSetup";
 
 type ContractNoMode = "sequential" | "uuid" | "manual";
 type DocumentContentMode = "auto" | "manual";
@@ -53,6 +54,7 @@ interface ContractProjectOption {
   id: string;
   name: string;
   sNo?: string | null;
+  fiscalYear?: string | null;
 }
 
 interface CompanyRecord {
@@ -65,6 +67,7 @@ interface CompanyRecord {
 interface UserCommitteeRecord {
   id: string;
   name: string;
+  fiscalYear?: string | null;
 }
 
 interface UserRecord {
@@ -1157,6 +1160,7 @@ export default function NewContractPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
+  const { data: setup } = useSystemSetup();
   const { mutateAsync: createContract, isPending } = useCreateContract();
   const [formData, setFormData] = useState<ContractFormData>(INITIAL_FORM_DATA);
 
@@ -1180,9 +1184,14 @@ export default function NewContractPage() {
 
   const debouncedProjectSearch = useDebounce(projectSearch, 350);
   const debouncedUserSearch = useDebounce(userSearch, 350);
+  const currentFiscalYear = setup?.currentFiscalYear;
+  const defaultOfficeSignatory =
+    setup?.chiefAdministrativeOfficerName?.trim() ?? "";
+  const defaultSectionChiefName = setup?.sectionChiefName?.trim() ?? "";
 
   const { data: projects, isLoading: isLoadingProjects } = useProjects({
     search: debouncedProjectSearch,
+    fiscalYear: currentFiscalYear,
   });
   const {
     data: users,
@@ -1190,7 +1199,9 @@ export default function NewContractPage() {
     isLoading: isLoadingUsers,
   } = useUsers({ search: debouncedUserSearch }, { enabled: isAdmin });
   const { data: companies, isLoading: isLoadingCompanies } = useCompanies();
-  const { data: userCommittees, isLoading: isLoadingUC } = useUserCommittees();
+  const { data: userCommittees, isLoading: isLoadingUC } = useUserCommittees({
+    fiscalYear: currentFiscalYear,
+  });
 
   const availableProjects = extractList<ContractProjectOption>(projects);
 
@@ -1199,7 +1210,9 @@ export default function NewContractPage() {
       availableProjects.map((project) => ({
         value: project.id,
         label: project.name,
-        sublabel: project.sNo ? `S.No: ${project.sNo}` : undefined,
+        sublabel: [project.sNo ? `S.No: ${project.sNo}` : null, project.fiscalYear]
+          .filter(Boolean)
+          .join(" | ") || undefined,
       })),
     [availableProjects]
   );
@@ -1302,6 +1315,16 @@ export default function NewContractPage() {
     agreementContentMode === "auto" ? agreementDraftText : formData.agreement.content;
   const workOrderContentValue =
     workOrderContentMode === "auto" ? workOrderDraftText : formData.workOrder.content;
+  const agreementFormData = {
+    ...formData.agreement,
+    officeSignatory: formData.agreement.officeSignatory || defaultOfficeSignatory,
+    witnessName: formData.agreement.witnessName || defaultSectionChiefName,
+  };
+  const workOrderFormData = {
+    ...formData.workOrder,
+    officeSignatory: formData.workOrder.officeSignatory || defaultOfficeSignatory,
+    witnessName: formData.workOrder.witnessName || defaultSectionChiefName,
+  };
   const activeStep = includeWorkOrder ? 2 : includeAgreement ? 1 : 0;
 
   const getRelevantFields = () => {
@@ -1580,6 +1603,9 @@ export default function NewContractPage() {
         ...current.agreement,
         agreementDate: current.agreement.agreementDate || current.startDate,
         amount: Number(current.agreement.amount || current.contractAmount),
+        officeSignatory:
+          current.agreement.officeSignatory || defaultOfficeSignatory,
+        witnessName: current.agreement.witnessName || defaultSectionChiefName,
       },
     }));
   };
@@ -1598,6 +1624,9 @@ export default function NewContractPage() {
         ...current.workOrder,
         workCompletionDate:
           current.workOrder.workCompletionDate || current.intendedCompletionDate,
+        officeSignatory:
+          current.workOrder.officeSignatory || defaultOfficeSignatory,
+        witnessName: current.workOrder.witnessName || defaultSectionChiefName,
       },
     }));
   };
@@ -1661,6 +1690,9 @@ export default function NewContractPage() {
           agreementDate: convertDate(formData.agreement.agreementDate)!,
           amount: Number(formData.agreement.amount || formData.contractAmount),
           content: agreementContentValue.trim(),
+          officeSignatory:
+            formData.agreement.officeSignatory || defaultOfficeSignatory,
+          witnessName: formData.agreement.witnessName || defaultSectionChiefName,
         }
       : undefined;
 
@@ -1669,6 +1701,9 @@ export default function NewContractPage() {
           ...formData.workOrder,
           workCompletionDate: convertDate(formData.workOrder.workCompletionDate)!,
           content: workOrderContentValue.trim(),
+          officeSignatory:
+            formData.workOrder.officeSignatory || defaultOfficeSignatory,
+          witnessName: formData.workOrder.witnessName || defaultSectionChiefName,
         }
       : undefined;
 
@@ -2114,7 +2149,7 @@ export default function NewContractPage() {
             />
           ) : (
             <AgreementForm
-              data={formData.agreement}
+              data={agreementFormData}
               draftText={agreementDraftText}
               contentMode={agreementContentMode}
               errorFor={(fieldPath) => fieldErrors[fieldPath]}
@@ -2153,7 +2188,7 @@ export default function NewContractPage() {
             />
           ) : (
             <WorkOrderForm
-              data={formData.workOrder}
+              data={workOrderFormData}
               draftText={workOrderDraftText}
               contentMode={workOrderContentMode}
               errorFor={(fieldPath) => fieldErrors[fieldPath]}

@@ -449,7 +449,7 @@ function EditCommitteeForm({ committee, id }: EditCommitteeFormProps) {
                 <FieldShell
                   htmlFor="fiscalYear"
                   label="Fiscal year"
-                  description="Format: 2082/083"
+                  description="Format: 2082/083 or 2082/83"
                   error={getFieldError("fiscalYear")}
                   icon={<CalendarDays className="h-4 w-4" />}
                 >

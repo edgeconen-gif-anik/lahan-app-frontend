@@ -21,6 +21,8 @@ type ContractListParams = {
   companyId?: string;
   userCommitteeId?: string;
   userId?: string;
+  siteInchargeId?: string;
+  fiscalYear?: string;
 };
 
 type MutationError = {

@@ -28,6 +28,7 @@ import {
   CONTRACT_STATUS_ORDER,
 } from "@/components/contract-status-badge";
 import { toNepaliDate } from "@/lib/date-utils";
+import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
 
 type ImplementationFilter = "ALL" | "COMPANY" | "USER_COMMITTEE";
 
@@ -318,7 +319,13 @@ export default function ContractLandingPage() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
-  const { data: contracts = [], isLoading } = useContracts();
+  const { data: setup } = useSystemSetup();
+  const { data: fiscalYears = [] } = useFiscalYears();
+  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const effectiveFiscalYear = fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
+  const { data: contracts = [], isLoading } = useContracts({
+    fiscalYear: effectiveFiscalYear || undefined,
+  });
   const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
   const { mutate: updateContractStatus, isPending: isUpdatingStatus } = useUpdateContractStatus();
 
@@ -435,7 +442,7 @@ export default function ContractLandingPage() {
           </div>
         )}
 
-        <div className="grid gap-3 rounded-xl border bg-card p-4 lg:grid-cols-[minmax(0,1fr),180px,180px]">
+        <div className="grid gap-3 rounded-xl border bg-card p-4 lg:grid-cols-[minmax(0,1fr),180px,180px,180px]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -446,6 +453,20 @@ export default function ContractLandingPage() {
               className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm"
             />
           </div>
+
+          <select
+            value={effectiveFiscalYear}
+            onChange={(event) => setFiscalYearFilter(event.target.value)}
+            className="h-10 rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="">All Fiscal Years</option>
+            {fiscalYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+                {year === setup?.currentFiscalYear ? " (Current)" : ""}
+              </option>
+            ))}
+          </select>
 
           <select
             value={implementationFilter}

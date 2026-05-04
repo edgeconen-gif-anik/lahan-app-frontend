@@ -25,6 +25,7 @@ import {
   type ProjectStatus,
 } from "@/lib/project-status";
 import { projectService } from "@/services/project/projectService";
+import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
 
 type SortColumn = "sNo" | "name" | "allocatedBudget" | "createdAt";
 
@@ -39,9 +40,12 @@ export default function ProjectLandingPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortColumn>("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const { data: setup } = useSystemSetup();
+  const { data: fiscalYears = [] } = useFiscalYears();
 
   const limit = 10;
 
@@ -54,14 +58,19 @@ export default function ProjectLandingPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  const effectiveFiscalYear = fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
+
   const { data, isLoading } = useProjects({
     page,
     limit,
     search: debouncedSearch || undefined,
+    fiscalYear: effectiveFiscalYear || undefined,
     sortBy,
     sortOrder,
   });
-  const { data: contracts = [] } = useContracts();
+  const { data: contracts = [] } = useContracts({
+    fiscalYear: effectiveFiscalYear || undefined,
+  });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -211,7 +220,7 @@ export default function ProjectLandingPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-card p-4 rounded-lg border">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-card p-4 rounded-lg border">
         <div className="relative">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -225,6 +234,22 @@ export default function ProjectLandingPage() {
             onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
+        <select
+          className="border rounded-md px-3 py-2 bg-background"
+          value={effectiveFiscalYear}
+          onChange={(e) => {
+            setFiscalYearFilter(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">All Fiscal Years</option>
+          {fiscalYears.map((year) => (
+            <option key={year} value={year}>
+              {year}
+              {year === setup?.currentFiscalYear ? " (Current)" : ""}
+            </option>
+          ))}
+        </select>
         <select
           className="border rounded-md px-3 py-2 bg-background"
           value={statusFilter}
