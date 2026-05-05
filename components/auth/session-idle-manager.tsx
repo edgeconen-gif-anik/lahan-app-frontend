@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 
 import { apiPost } from "@/lib/api";
+import { logoutFromApp } from "@/lib/auth/logout";
 import {
   SESSION_ABSOLUTE_TIMEOUT_MS,
   SESSION_HEARTBEAT_INTERVAL_MS,
@@ -11,7 +12,12 @@ import {
   SESSION_IDLE_TIMEOUT_MS,
 } from "@/lib/auth/session-config";
 
-const ACTIVITY_EVENTS = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
+const ACTIVITY_EVENTS = [
+  "pointerdown",
+  "keydown",
+  "scroll",
+  "touchstart",
+] as const;
 
 export function SessionIdleManager() {
   const { data: session, status } = useSession();
@@ -52,7 +58,7 @@ export function SessionIdleManager() {
         actionInFlightRef.current = true;
 
         try {
-          await signOut({ callbackUrl: "/login" });
+          await logoutFromApp("/login");
         } finally {
           actionInFlightRef.current = false;
         }

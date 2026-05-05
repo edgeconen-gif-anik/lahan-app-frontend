@@ -3,9 +3,8 @@ import axios, {
   AxiosRequestConfig,
   InternalAxiosRequestConfig,
 } from "axios";
-import { getSession, signOut } from "next-auth/react";
-
-let signOutInProgress = false;
+import { getSession } from "next-auth/react";
+import { logoutFromApp } from "@/lib/auth/logout";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000",
@@ -17,8 +16,9 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const skipAuth = (config as InternalAxiosRequestConfig & { skipAuth?: boolean })
-      .skipAuth || false;
+    const skipAuth =
+      (config as InternalAxiosRequestConfig & { skipAuth?: boolean })
+        .skipAuth || false;
 
     if (!skipAuth) {
       const session = await getSession();
@@ -30,7 +30,7 @@ api.interceptors.request.use(
 
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 api.interceptors.response.use(
@@ -44,15 +44,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !skipAuth) {
       console.error("Unauthorized: token may be expired or invalid");
 
-      if (!signOutInProgress) {
-        signOutInProgress = true;
-
-        try {
-          await signOut({ callbackUrl: "/login" });
-        } finally {
-          signOutInProgress = false;
-        }
-      }
+      await logoutFromApp("/login");
     }
 
     if (error.response?.status === 403) {
@@ -73,7 +65,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 interface RequestConfig extends AxiosRequestConfig {
@@ -83,7 +75,7 @@ interface RequestConfig extends AxiosRequestConfig {
 export const apiPost = async (
   url: string,
   data?: unknown,
-  config?: { useAuth?: boolean }
+  config?: { useAuth?: boolean },
 ) => {
   const requestConfig: RequestConfig & { skipAuth?: boolean } = {
     ...config,

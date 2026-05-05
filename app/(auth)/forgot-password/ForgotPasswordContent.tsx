@@ -17,11 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -70,7 +66,7 @@ export default function ForgotPasswordContent() {
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Unable to start password reset. Please try again."
+          data.message || "Unable to start password reset. Please try again.",
         );
       }
 
@@ -87,7 +83,7 @@ export default function ForgotPasswordContent() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Unable to start password reset. Please try again."
+          : "Unable to start password reset. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -98,11 +94,9 @@ export default function ForgotPasswordContent() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-900">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">
-            Forgot Password
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
           <CardDescription>
-            Enter your email to continue to password reset.
+            Enter your email and we&apos;ll send a reset link.
           </CardDescription>
         </CardHeader>
 
@@ -120,10 +114,7 @@ export default function ForgotPasswordContent() {
           )}
 
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-4"
-            >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="email"
@@ -142,15 +133,9 @@ export default function ForgotPasswordContent() {
                 )}
               />
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Continue
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send reset link
               </Button>
             </form>
           </Form>

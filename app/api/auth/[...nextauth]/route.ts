@@ -55,16 +55,24 @@ const providers: NextAuthOptions["providers"] = [
       if (!isBackendConfigured) {
         console.error(
           "Credentials login blocked: BACKEND_URL/NEXT_PUBLIC_API_URL is missing or still points to a local address in production.",
-          BACKEND_URL
+          BACKEND_URL,
         );
         return null;
       }
 
       try {
-        const res = await axios.post(`${BACKEND_URL}/auth/login`, {
-          email: credentials?.email,
-          password: credentials?.password,
-        });
+        const email = credentials?.email?.trim().toLowerCase();
+
+        const res = await axios.post(
+          `${BACKEND_URL}/auth/login`,
+          {
+            email,
+            password: credentials?.password,
+          },
+          {
+            timeout: 10000,
+          },
+        );
 
         const user = res.data;
         return user && user.accessToken ? user : null;
@@ -73,7 +81,7 @@ const providers: NextAuthOptions["providers"] = [
           console.error(
             "Credentials login failed:",
             error.response.status,
-            error.response.data
+            error.response.data,
           );
         } else {
           console.error("Credentials login failed:", error);
@@ -87,7 +95,7 @@ const providers: NextAuthOptions["providers"] = [
 if (googleClientId && googleClientSecret) {
   if (!authBaseUrl) {
     console.warn(
-      `Google OAuth is configured with credentials, but no stable auth base URL was found. ${googleSetupMessage}`
+      `Google OAuth is configured with credentials, but no stable auth base URL was found. ${googleSetupMessage}`,
     );
   }
 
@@ -95,7 +103,7 @@ if (googleClientId && googleClientSecret) {
     GoogleProvider({
       clientId: googleClientId,
       clientSecret: googleClientSecret,
-    })
+    }),
   );
 }
 
@@ -111,7 +119,7 @@ export const authOptions: NextAuthOptions = {
       if (!isBackendConfigured) {
         console.error(
           "Google login blocked: BACKEND_URL/NEXT_PUBLIC_API_URL is missing or still points to a local address in production.",
-          BACKEND_URL
+          BACKEND_URL,
         );
         return "/login?error=BackendConfig";
       }
@@ -141,7 +149,7 @@ export const authOptions: NextAuthOptions = {
           console.error(
             "Google backend sync failed:",
             error.response.status,
-            error.response.data
+            error.response.data,
           );
           return "/login?error=GoogleSyncFailed";
         } else {

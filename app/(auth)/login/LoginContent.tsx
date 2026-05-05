@@ -27,11 +27,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Validation Schema
 const loginSchema = z.object({
@@ -94,17 +90,23 @@ export default function LoginContent({
     setIsLoading(true);
     setGlobalError(null);
 
-    const result = await signIn("credentials", {
-      email: values.email,
-      password: values.password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email: values.email.trim().toLowerCase(),
+        password: values.password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setIsLoading(false);
-      setGlobalError("Invalid email or password.");
-    } else {
+      if (result?.error) {
+        setGlobalError("Invalid email or password.");
+        return;
+      }
+
       router.push("/dashboard");
+    } catch {
+      setGlobalError("Unable to sign in right now. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -112,7 +114,7 @@ export default function LoginContent({
     if (!isGoogleLoginEnabled) {
       setGlobalError(
         googleSetupMessage ||
-          "Google sign-in is not configured yet. Add real GOOGLE_CLIENT_SECRET and GOOGLE_CLIENT_ID or NEXT_PUBLIC_GOOGLE_CLIENT_ID values in .env.local."
+          "Google sign-in is not configured yet. Add real GOOGLE_CLIENT_SECRET and GOOGLE_CLIENT_ID or NEXT_PUBLIC_GOOGLE_CLIENT_ID values in .env.local.",
       );
       return;
     }
@@ -120,7 +122,7 @@ export default function LoginContent({
     if (!isGoogleLoginReady) {
       setGlobalError(
         googleSetupMessage ||
-          "Google sign-in needs NEXTAUTH_URL or AUTH_URL set to the exact app URL before it can start."
+          "Google sign-in needs NEXTAUTH_URL or AUTH_URL set to the exact app URL before it can start.",
       );
       return;
     }
@@ -134,12 +136,8 @@ export default function LoginContent({
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">
-            Welcome Back
-          </CardTitle>
-          <CardDescription>
-            Sign in to Lahan Project Management
-          </CardDescription>
+          <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+          <CardDescription>Sign in to Lahan Project Management</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -156,10 +154,7 @@ export default function LoginContent({
 
           {/* Credentials Form */}
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-4"
-            >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="email"
@@ -169,6 +164,7 @@ export default function LoginContent({
                     <FormControl>
                       <Input
                         placeholder="staff@lahan.gov.np"
+                        autoComplete="email"
                         {...field}
                         disabled={isLoading}
                       />
@@ -195,6 +191,7 @@ export default function LoginContent({
                     <FormControl>
                       <Input
                         type="password"
+                        autoComplete="current-password"
                         {...field}
                         disabled={isLoading}
                       />
@@ -204,14 +201,8 @@ export default function LoginContent({
                 )}
               />
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign In
               </Button>
             </form>
@@ -264,8 +255,7 @@ export default function LoginContent({
               {googleRedirectUri ? (
                 <>
                   {" "}
-                  Authorized redirect URI:{" "}
-                  <code>{googleRedirectUri}</code>
+                  Authorized redirect URI: <code>{googleRedirectUri}</code>
                 </>
               ) : null}
             </p>
