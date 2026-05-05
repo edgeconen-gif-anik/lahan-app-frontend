@@ -27,8 +27,8 @@ export const DesignationEnum = z.enum([
 //
 
 export const EmbeddedUserSchema = z.object({
-  id:          z.string(),
-  name:        z.string().nullable(),
+  id: z.string(),
+  name: z.string().nullable(),
   designation: DesignationEnum.nullable().optional(),
 });
 
@@ -40,22 +40,22 @@ export type EmbeddedUser = z.infer<typeof EmbeddedUserSchema>;
 //
 
 export const ContractProjectSchema = z.object({
-  id:   z.string(),
+  id: z.string(),
   name: z.string(),
-  sNo:  z.string().nullable().optional(),
+  sNo: z.string().nullable().optional(),
   fiscalYear: z.string().nullable().optional(),
   // ✅ siteIncharge on the project (inherited)
   siteIncharge: EmbeddedUserSchema.nullable().optional(),
 });
 
 export const ContractCompanySchema = z.object({
-  id:        z.string(),
-  name:      z.string(),
+  id: z.string(),
+  name: z.string(),
   panNumber: z.number().optional(), // ✅ number — matches Prisma Int field
 });
 
 export const ContractUserCommitteeSchema = z.object({
-  id:   z.string(),
+  id: z.string(),
   name: z.string(),
 });
 
@@ -65,31 +65,31 @@ export const ContractUserCommitteeSchema = z.object({
 //
 
 export const AgreementSchema = z.object({
-  id:                  z.string(),
-  contractId:          z.string(),
-  agreementDate:       z.string(), // ISO string
-  content:             z.string(),
-  amount:              z.number(),
+  id: z.string(),
+  contractId: z.string(),
+  agreementDate: z.string(), // ISO string
+  content: z.string(),
+  amount: z.number(),
   contractorSignatory: z.string().nullable().optional(),
-  officeSignatory:     z.string().nullable().optional(),
-  witnessName:         z.string().nullable().optional(),
-  contractorSignedAt:  z.string().nullable().optional(), // ✅ added — exists in schema
-  officeSignedAt:      z.string().nullable().optional(), // ✅ added — exists in schema
-  createdAt:           z.string(),
-  updatedAt:           z.string(),
+  officeSignatory: z.string().nullable().optional(),
+  witnessName: z.string().nullable().optional(),
+  contractorSignedAt: z.string().nullable().optional(), // ✅ added — exists in schema
+  officeSignedAt: z.string().nullable().optional(), // ✅ added — exists in schema
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export const WorkOrderSchema = z.object({
-  id:                  z.string(),
-  contractId:          z.string(),
-  issuedDate:          z.string(),                        // ✅ added — @default(now()) in schema
-  workCompletionDate:  z.string(),
-  content:             z.string(),
+  id: z.string(),
+  contractId: z.string(),
+  issuedDate: z.string(), // ✅ added — @default(now()) in schema
+  workCompletionDate: z.string(),
+  content: z.string(),
   contractorSignatory: z.string().nullable().optional(),
-  officeSignatory:     z.string().nullable().optional(),
-  witnessName:         z.string().nullable().optional(),
-  createdAt:           z.string(),
-  updatedAt:           z.string(),
+  officeSignatory: z.string().nullable().optional(),
+  witnessName: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 //
@@ -98,37 +98,38 @@ export const WorkOrderSchema = z.object({
 //
 
 export const ContractSchema = z.object({
-  id:             z.string(),
+  id: z.string(),
   contractNumber: z.string(),
+  fiscalYear: z.string(),
   completionCode: z.string().nullable().optional(),
   contractAmount: z.number(),
   finalEvaluatedAmount: z.number().nullable().optional(),
 
-  startDate:              z.string(), // ISO
+  startDate: z.string(), // ISO
   intendedCompletionDate: z.string(), // ISO
-  actualCompletionDate:   z.string().nullable().optional(),
+  actualCompletionDate: z.string().nullable().optional(),
 
-  status:  ContractStatusEnum,
+  status: ContractStatusEnum,
   approvalStatus: ApprovalStatusEnum,
   approvedAt: z.string().nullable().optional(),
   remarks: z.string().nullable().optional(),
 
   // Foreign keys
-  projectId:       z.string(),
-  companyId:       z.string().nullable().optional(),
+  projectId: z.string(),
+  companyId: z.string().nullable().optional(),
   userCommitteeId: z.string().nullable().optional(),
-  userID:          z.string().nullable().optional(), // ✅ userID — matches Prisma field exactly
-  siteInchargeId:  z.string().nullable().optional(), // ✅ added — new field on Contract
+  userID: z.string().nullable().optional(), // ✅ userID — matches Prisma field exactly
+  siteInchargeId: z.string().nullable().optional(), // ✅ added — new field on Contract
 
   // Relations (all optional — may be null depending on contract type)
-  project:       ContractProjectSchema.nullable().optional(),
-  company:       ContractCompanySchema.nullable().optional(),
+  project: ContractProjectSchema.nullable().optional(),
+  company: ContractCompanySchema.nullable().optional(),
   userCommittee: ContractUserCommitteeSchema.nullable().optional(),
-  user:          EmbeddedUserSchema.nullable().optional(),        // committee rep
-  siteIncharge:  EmbeddedUserSchema.nullable().optional(),        // ✅ direct site incharge
+  user: EmbeddedUserSchema.nullable().optional(), // committee rep
+  siteIncharge: EmbeddedUserSchema.nullable().optional(), // ✅ direct site incharge
 
   agreement: AgreementSchema.nullable().optional(),
-  workOrder:  WorkOrderSchema.nullable().optional(),
+  workOrder: WorkOrderSchema.nullable().optional(),
 
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -140,43 +141,43 @@ export const ContractSchema = z.object({
 //
 
 export const AgreementPayloadSchema = z.object({
-  agreementDate:       z.string(),
-  content:             z.string().min(10),
-  amount:              z.number().positive(),
+  agreementDate: z.string(),
+  content: z.string().min(10),
+  amount: z.number().positive(),
   contractorSignatory: z.string().optional(),
-  officeSignatory:     z.string().optional(),
-  witnessName:         z.string().optional(),
+  officeSignatory: z.string().optional(),
+  witnessName: z.string().optional(),
 });
 
 export const WorkOrderPayloadSchema = z.object({
-  workCompletionDate:  z.string(),
-  content:             z.string().min(10),
+  workCompletionDate: z.string(),
+  content: z.string().min(10),
   contractorSignatory: z.string().optional(),
-  officeSignatory:     z.string().optional(),
-  witnessName:         z.string().optional(),
+  officeSignatory: z.string().optional(),
+  witnessName: z.string().optional(),
 });
 
 export const CreateContractPayloadSchema = z
   .object({
-    projectId:       z.string().uuid(),
-    companyId:       z.string().uuid().optional(),
+    projectId: z.string().uuid(),
+    companyId: z.string().uuid().optional(),
     userCommitteeId: z.string().uuid().optional(),
-    userID:          z.string().uuid().optional(), // ✅ userID — committee rep
-    siteInchargeId:  z.string().uuid().optional(), // ✅ added
+    userID: z.string().uuid().optional(), // ✅ userID — committee rep
+    siteInchargeId: z.string().uuid().optional(), // ✅ added
 
-    contractNumber:      z.string().min(1),
-    contractAmount:      z.number().positive(),
+    contractNumber: z.string().min(1),
+    contractAmount: z.number().positive(),
     finalEvaluatedAmount: z.number().positive().optional(),
-    status:              ContractStatusEnum.optional(),
+    status: ContractStatusEnum.optional(),
 
-    startDate:              z.string(),
+    startDate: z.string(),
     intendedCompletionDate: z.string(),
-    actualCompletionDate:   z.string().optional(),
+    actualCompletionDate: z.string().optional(),
 
     remarks: z.string().optional(),
 
     agreement: AgreementPayloadSchema.optional(),
-    workOrder:  WorkOrderPayloadSchema.optional(),
+    workOrder: WorkOrderPayloadSchema.optional(),
   })
 
   // Must have either company or committee
@@ -211,25 +212,25 @@ export const CreateContractPayloadSchema = z
 
 export const UpdateContractPayloadSchema = z
   .object({
-    projectId:       z.string().uuid().optional(),
-    companyId:       z.string().uuid().optional(),
+    projectId: z.string().uuid().optional(),
+    companyId: z.string().uuid().optional(),
     userCommitteeId: z.string().uuid().optional(),
-    userID:          z.string().uuid().optional(), // ✅ userID — matches Prisma field
-    siteInchargeId:  z.string().uuid().optional(), // ✅ added
+    userID: z.string().uuid().optional(), // ✅ userID — matches Prisma field
+    siteInchargeId: z.string().uuid().optional(), // ✅ added
 
-    contractNumber:      z.string().min(1).optional(),
-    contractAmount:      z.number().positive().optional(),
+    contractNumber: z.string().min(1).optional(),
+    contractAmount: z.number().positive().optional(),
     finalEvaluatedAmount: z.number().positive().optional(),
-    status:              ContractStatusEnum.optional(),
+    status: ContractStatusEnum.optional(),
 
-    startDate:              z.string().optional(),
+    startDate: z.string().optional(),
     intendedCompletionDate: z.string().optional(),
-    actualCompletionDate:   z.string().optional(),
+    actualCompletionDate: z.string().optional(),
 
     remarks: z.string().optional(),
 
     agreement: AgreementPayloadSchema.partial().optional(),
-    workOrder:  WorkOrderPayloadSchema.partial().optional(),
+    workOrder: WorkOrderPayloadSchema.partial().optional(),
   })
 
   // intendedCompletionDate must be after startDate (if both provided)
@@ -260,12 +261,12 @@ export const UpdateContractPayloadSchema = z
 // ─── INFERRED TYPES ──────────────────────────────────────────────────────────
 //
 
-export type Contract               = z.infer<typeof ContractSchema>;
-export type ContractStatus         = z.infer<typeof ContractStatusEnum>;
-export type CreateContractPayload  = z.infer<typeof CreateContractPayloadSchema>;
-export type UpdateContractPayload  = z.infer<typeof UpdateContractPayloadSchema>;
-export type AgreementPayload       = z.infer<typeof AgreementPayloadSchema>;
-export type WorkOrderPayload       = z.infer<typeof WorkOrderPayloadSchema>;
+export type Contract = z.infer<typeof ContractSchema>;
+export type ContractStatus = z.infer<typeof ContractStatusEnum>;
+export type CreateContractPayload = z.infer<typeof CreateContractPayloadSchema>;
+export type UpdateContractPayload = z.infer<typeof UpdateContractPayloadSchema>;
+export type AgreementPayload = z.infer<typeof AgreementPayloadSchema>;
+export type WorkOrderPayload = z.infer<typeof WorkOrderPayloadSchema>;
 
 export const ProjectUpdatePayloadSchema = z.object({
   finalEvaluatedAmount: z.number().positive(),
@@ -280,7 +281,9 @@ export type ProjectUpdatePayload = z.infer<typeof ProjectUpdatePayloadSchema>;
 
 export const NextContractNumberResponseSchema = z.object({
   contractNumber: z.string(),
-  sequence:       z.number(),
+  sequence: z.number(),
 });
 
-export type NextContractNumberResponse = z.infer<typeof NextContractNumberResponseSchema>;
+export type NextContractNumberResponse = z.infer<
+  typeof NextContractNumberResponseSchema
+>;
