@@ -18,6 +18,17 @@ export type ReportDataParams = {
   fiscalYear?: string;
 };
 
+function uniqueById<T extends { id: string }>(items: T[]) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+
+    seen.add(item.id);
+    return true;
+  });
+}
+
 async function fetchAllProjects(params: ProjectQueryParams = {}) {
   const limit = 100;
   const firstPage = (await projectService.getAll({
@@ -32,7 +43,7 @@ async function fetchAllProjects(params: ProjectQueryParams = {}) {
   );
 
   if (totalPages === 1) {
-    return firstPage.data;
+    return uniqueById(firstPage.data);
   }
 
   const remainingPages = await Promise.all(
@@ -45,10 +56,10 @@ async function fetchAllProjects(params: ProjectQueryParams = {}) {
     ),
   );
 
-  return [
+  return uniqueById([
     ...firstPage.data,
     ...remainingPages.flatMap((page) => page.data),
-  ];
+  ]);
 }
 
 export const reportService = {
@@ -72,10 +83,10 @@ export const reportService = {
       ]);
 
     return {
-      companies,
-      committees: committeesResponse.data,
-      contracts,
-      projects,
+      companies: uniqueById(companies),
+      committees: uniqueById(committeesResponse.data),
+      contracts: uniqueById(contracts),
+      projects: uniqueById(projects),
     };
   },
 };

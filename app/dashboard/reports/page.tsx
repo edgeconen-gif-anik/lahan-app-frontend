@@ -38,9 +38,7 @@ import type { Project } from "@/lib/schema";
 import type { Company } from "@/lib/schema/company.schema";
 import type { Contract, ContractStatus } from "@/lib/schema/contract/contract";
 import { toNepaliDate } from "@/lib/date-utils";
-import {
-  deriveProjectStatusFromContracts,
-} from "@/lib/project-status";
+import { deriveProjectStatusFromContracts } from "@/lib/project-status";
 import type {
   CommitteeOfficial,
   UserCommitteeRecord,
@@ -246,11 +244,16 @@ function getContractImplementor(contract: Contract) {
   };
 }
 
-function buildContractRows(contracts: Contract[]): ReportRow[] {
+function buildContractRows(contracts: Contract[], projects: Project[]): ReportRow[] {
+  const projectTypeById = new Map(
+    projects.map((project) => [project.id, project.type]),
+  );
+
   return contracts.map((contract, index) => {
     const implementor = getContractImplementor(contract);
     const siteIncharge =
       contract.siteIncharge?.name ?? contract.project?.siteIncharge?.name ?? DASH;
+    const projectType = projectTypeById.get(contract.projectId);
 
     return {
       id: contract.id,
@@ -260,6 +263,7 @@ function buildContractRows(contracts: Contract[]): ReportRow[] {
         contractNumber: text(contract.contractNumber),
         fiscalYear: text(contract.fiscalYear ?? contract.project?.fiscalYear),
         project: text(contract.project?.name),
+        projectType: text(projectType),
         projectSNo: text(contract.project?.sNo),
         implementorType: implementor.type,
         implementorName: text(implementor.name),
@@ -473,6 +477,7 @@ export default function ReportsPage() {
           { key: "contractNumber", label: "Contract No." },
           { key: "fiscalYear", label: "Fiscal Year" },
           { key: "project", label: "Project" },
+          { key: "projectType", label: "Project Type" },
           { key: "projectSNo", label: "Project S.No" },
           { key: "implementorType", label: "Implementor Type" },
           { key: "implementorName", label: "Implementor" },
@@ -488,7 +493,7 @@ export default function ReportsPage() {
           { key: "workOrder", label: "Work Order", align: "center" },
           { key: "completionCode", label: "Completion Code" },
         ],
-        rows: buildContractRows(contracts),
+        rows: buildContractRows(contracts, projects),
       },
       {
         key: "projects",
@@ -602,8 +607,8 @@ export default function ReportsPage() {
             className="h-10 rounded-md border bg-background px-3 text-sm"
           >
             <option value="">All Fiscal Years</option>
-            {fiscalYears.map((year) => (
-              <option key={year} value={year}>
+            {fiscalYears.map((year, index) => (
+              <option key={`${year}-${index}`} value={year}>
                 {year}
                 {year === setup?.currentFiscalYear ? " (Current)" : ""}
               </option>
@@ -779,8 +784,8 @@ export default function ReportsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredRows.map((row) => (
-                  <TableRow key={row.id}>
+                filteredRows.map((row, rowIndex) => (
+                  <TableRow key={`${activeSection.key}-${row.id}-${rowIndex}`}>
                     {activeSection.columns.map((column) => {
                       const value = row.values[column.key] ?? DASH;
                       const isStatusColumn =
