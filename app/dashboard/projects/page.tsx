@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
   ArrowDown,
@@ -13,6 +14,7 @@ import {
   Eye,
   FileUp,
   Filter,
+  Pencil,
   Plus,
   Search,
 } from "lucide-react";
@@ -36,6 +38,8 @@ type DisplayProject = Project & {
 
 export default function ProjectLandingPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -170,25 +174,27 @@ export default function ProjectLandingPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Projects</h1>
-        <div className="flex gap-2">
-          <label className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md cursor-pointer hover:bg-secondary/80 transition">
-            <FileUp size={18} />
-            <span>Upload CSV</span>
-            <input
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-          </label>
-          <Link
-            href="/dashboard/projects/new"
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
-          >
-            <Plus size={18} />
-            Create Project
-          </Link>
-        </div>
+        {isAdmin ? (
+          <div className="flex gap-2">
+            <label className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md cursor-pointer hover:bg-secondary/80 transition">
+              <FileUp size={18} />
+              <span>Upload CSV</span>
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+            </label>
+            <Link
+              href="/dashboard/projects/new"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
+            >
+              <Plus size={18} />
+              Create Project
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -371,9 +377,19 @@ export default function ProjectLandingPage() {
                       <Link
                         href={`/dashboard/projects/${project.id}`}
                         className="inline-flex items-center p-2 hover:bg-muted rounded-full"
+                        title="View project"
                       >
                         <Eye size={18} />
                       </Link>
+                      {isAdmin ? (
+                        <Link
+                          href={`/dashboard/projects/${project.id}/edit`}
+                          className="inline-flex items-center p-2 hover:bg-muted rounded-full"
+                          title="Edit project"
+                        >
+                          <Pencil size={18} />
+                        </Link>
+                      ) : null}
                     </td>
                   </tr>
                 ))

@@ -6,6 +6,7 @@ export const ProjectImplantedThroughEnum = z.enum(["COMP", "USER_COMMITTEE"]);
 
 // Base Fields that apply to all projects
 const baseProjectSchema = z.object({
+  sNo: z.string().optional().or(z.literal("")).nullable(),
   name: z.string().min(2, "Name is required"),
   type: z.string().min(1, "Type is required"), // e.g., "Road", "Building"
   budgetCode: z.string().min(1, "Budget Code is required"),
@@ -20,13 +21,13 @@ const baseProjectSchema = z.object({
   status: ProjectStatusEnum.default("NOT_STARTED"),
 
   // Staff Relations: Allow valid UUIDs, undefined, or empty strings
-  projectManagerId: z.string().uuid().optional().or(z.literal("")),
-  siteInchargeId: z.string().uuid().optional().or(z.literal("")),
+  projectManagerId: z.string().uuid().optional().or(z.literal("")).nullable(),
+  siteInchargeId: z.string().uuid().optional().or(z.literal("")).nullable(),
   
   // Define these here so they exist in the type, but validate them in superRefine
-  implantedThrough: ProjectImplantedThroughEnum.optional().or(z.literal("")),
-  companyId: z.string().uuid("Invalid UUID").optional().or(z.literal("")),
-  userCommitteeId: z.string().uuid("Invalid UUID").optional().or(z.literal("")),
+  implantedThrough: ProjectImplantedThroughEnum.optional().or(z.literal("")).nullable(),
+  companyId: z.string().uuid("Invalid UUID").optional().or(z.literal("")).nullable(),
+  userCommitteeId: z.string().uuid("Invalid UUID").optional().or(z.literal("")).nullable(),
 });
 
 // Conditional Logic using superRefine for optimal form compatibility

@@ -5,6 +5,19 @@ import { ProjectQueryParams } from "@/lib/schema"; // Ensure this is updated (se
 import { toast } from "sonner"; 
 import { useRouter } from "next/navigation";
 
+type MutationError = {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  const message = (error as MutationError)?.response?.data?.message;
+  return Array.isArray(message) ? message.join(", ") : (message ?? fallback);
+}
+
 // Keys for caching
 const PROJECT_KEYS = {
   all: ["projects"] as const,
@@ -51,8 +64,8 @@ export const useCreateProject = () => {
       queryClient.invalidateQueries({ queryKey: PROJECT_KEYS.lists() });
       router.push(`/dashboard/projects/${data.id}`);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to create project");
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to create project"));
     },
   });
 };
@@ -70,8 +83,8 @@ export const useUpdateProject = () => {
       queryClient.invalidateQueries({ queryKey: PROJECT_KEYS.detail(data.id) });
       queryClient.invalidateQueries({ queryKey: PROJECT_KEYS.lists() });
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to update project");
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to update project"));
     },
   });
 };
@@ -90,8 +103,8 @@ export const useDeleteProject = () => {
       queryClient.invalidateQueries({ queryKey: PROJECT_KEYS.lists() });
       router.push("/dashboard/projects");
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to delete");
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to delete"));
     },
   });
 };

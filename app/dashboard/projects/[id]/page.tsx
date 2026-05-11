@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Briefcase, Calendar, DollarSign, MapPin, Trash2, User } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { Briefcase, Calendar, DollarSign, MapPin, Pencil, Trash2, User } from "lucide-react";
 import { useContracts } from "@/hooks/contract/useContracts";
 import { useDeleteProject, useProject } from "@/hooks/project/useProjects";
 import { deriveProjectStatusFromContracts } from "@/lib/project-status";
@@ -13,6 +14,8 @@ import { ContractStatusBadge } from "@/components/contract-status-badge";
 
 export default function ProjectProfilePage() {
   const { id } = useParams();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
   const { data: project, isLoading } = useProject(id as string);
   const { data: contracts = [], isLoading: isContractsLoading } = useContracts({
     projectId: id as string,
@@ -51,14 +54,25 @@ export default function ProjectProfilePage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => confirm("Are you sure?") && deleteProject(project.id)}
-          className="inline-flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-white"
-        >
-          <Trash2 className="h-4 w-4" />
-          Delete Project
-        </button>
+        {isAdmin ? (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/dashboard/projects/${project.id}/edit`}
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit Project
+            </Link>
+            <button
+              type="button"
+              onClick={() => confirm("Are you sure?") && deleteProject(project.id)}
+              className="inline-flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-white"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Project
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr,1fr]">
