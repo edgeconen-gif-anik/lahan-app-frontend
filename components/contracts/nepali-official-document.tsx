@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { ArrowLeft, Printer } from "lucide-react";
 import { Noto_Sans_Devanagari } from "next/font/google";
@@ -39,6 +39,7 @@ type NepaliOfficialDocumentProps = {
   meta: DocumentMeta[];
   noteContent?: string | null;
   noteTitle?: string;
+  postBodyContent?: ReactNode;
   printBottomReserveMm?: number;
   printTopShiftMm?: number;
   qrCodeLabel?: string;
@@ -78,6 +79,7 @@ export function NepaliOfficialDocument({
   meta,
   noteContent,
   noteTitle = "रेकर्ड गरिएको थप विवरण",
+  postBodyContent,
   printBottomReserveMm,
   printTopShiftMm,
   qrCodeLabel = "QR",
@@ -99,6 +101,7 @@ export function NepaliOfficialDocument({
   const isCompact = density === "compact";
   const isNarrowContent = contentWidth === "narrow";
   const hasSubject = Boolean(subject.trim());
+  const hasSignatures = signatures.length > 0;
   const isBottomRightSignature =
     signatureLayout === "bottom-right" && signatures.length === 1;
   const hasMetaText = Boolean(documentLabel || meta.length > 0);
@@ -412,20 +415,97 @@ export function NepaliOfficialDocument({
                 ) : null}
               </section>
 
-              <section
-                className={
-                  isBottomRightSignature
-                    ? isCompact
-                      ? "official-document-signatures mt-8 flex justify-end pt-2"
-                      : "official-document-signatures mt-12 flex justify-end pt-4"
-                    : `official-document-signatures grid ${
-                        isCompact ? "mt-8 gap-4 pt-2 md:grid-cols-3" : "mt-12 gap-8 pt-4 sm:grid-cols-2 lg:grid-cols-3"
-                      }`
-                }
-              >
-                {isBottomRightSignature ? (
-                  <div className={isCompact ? "flex items-end gap-3" : "flex items-end gap-4"}>
-                    {signatures.map((signature) => {
+              {postBodyContent}
+
+              {hasSignatures ? (
+                <section
+                  className={
+                    isBottomRightSignature
+                      ? isCompact
+                        ? "official-document-signatures mt-8 flex justify-end pt-2"
+                        : "official-document-signatures mt-12 flex justify-end pt-4"
+                      : `official-document-signatures grid ${
+                          isCompact ? "mt-8 gap-4 pt-2 md:grid-cols-3" : "mt-12 gap-8 pt-4 sm:grid-cols-2 lg:grid-cols-3"
+                        }`
+                  }
+                >
+                  {isBottomRightSignature ? (
+                    <div className={isCompact ? "flex items-end gap-3" : "flex items-end gap-4"}>
+                      {signatures.map((signature) => {
+                        const resolvedName = signature.name?.trim();
+                        const shouldShowName = Boolean(
+                          resolvedName || signature.showPlaceholderWhenNameMissing !== false
+                        );
+
+                        return (
+                          <div
+                            key={signature.label}
+                            className={isCompact ? "w-full max-w-[190px] space-y-2 text-center" : "w-full max-w-[220px] space-y-3 text-center"}
+                          >
+                            <div
+                              className={`mx-auto h-px w-full border-t border-dashed border-stone-500 ${
+                                isCompact ? "max-w-[180px]" : "max-w-[220px]"
+                              }`}
+                            />
+                            <div className={isCompact ? "space-y-0.5 leading-6" : "space-y-1 leading-7"}>
+                              {signatureNamePlacement === "below" ? (
+                                <>
+                                  <p className={isCompact ? "text-[13px] text-stone-700" : "text-sm text-stone-700"}>
+                                    {signature.label}
+                                  </p>
+                                  {shouldShowName ? (
+                                    <p className={isCompact ? "text-[14px] font-semibold text-stone-900" : "text-[15px] font-semibold text-stone-900"}>
+                                      {resolvedName || "........................"}
+                                    </p>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <>
+                                  {shouldShowName ? (
+                                    <p className={isCompact ? "text-[14px] font-semibold text-stone-900" : "text-[15px] font-semibold text-stone-900"}>
+                                      {resolvedName || "........................"}
+                                    </p>
+                                  ) : null}
+                                  <p className={isCompact ? "text-[13px] text-stone-700" : "text-sm text-stone-700"}>
+                                    {signature.label}
+                                  </p>
+                                </>
+                              )}
+                              {signature.note ? (
+                                <p className={isCompact ? "text-[11px] leading-5 text-stone-500" : "text-xs leading-6 text-stone-500"}>
+                                  {signature.note}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {showInlineBottomQr ? (
+                        <div
+                          className={`official-document-qr flex flex-col items-center rounded-[16px] border border-stone-200 bg-white shadow-sm ${
+                            isCompact ? "w-fit" : "w-fit"
+                          }`}
+                        >
+                          {resolvedQrCodeValue ? (
+                            <QRCode
+                              value={resolvedQrCodeValue}
+                              size={isCompact ? 48 : 58}
+                              level="M"
+                              bgColor="#ffffff"
+                              fgColor="#111827"
+                            />
+                          ) : (
+                            <div className={isCompact ? "h-[48px] w-[48px] bg-stone-100" : "h-[58px] w-[58px] bg-stone-100"} />
+                          )}
+                          <p className={isCompact ? "mt-1 text-[8px] font-medium text-stone-500" : "mt-1 text-[9px] font-medium text-stone-500"}>
+                            {qrCodeLabel}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    signatures.map((signature) => {
                       const resolvedName = signature.name?.trim();
                       const shouldShowName = Boolean(
                         resolvedName || signature.showPlaceholderWhenNameMissing !== false
@@ -434,7 +514,7 @@ export function NepaliOfficialDocument({
                       return (
                         <div
                           key={signature.label}
-                          className={isCompact ? "w-full max-w-[190px] space-y-2 text-center" : "w-full max-w-[220px] space-y-3 text-center"}
+                          className={isCompact ? "space-y-2 text-center" : "space-y-3 text-center"}
                         >
                           <div
                             className={`mx-auto h-px w-full border-t border-dashed border-stone-500 ${
@@ -473,83 +553,10 @@ export function NepaliOfficialDocument({
                           </div>
                         </div>
                       );
-                    })}
-
-                    {showInlineBottomQr ? (
-                      <div
-                        className={`official-document-qr flex flex-col items-center rounded-[16px] border border-stone-200 bg-white shadow-sm ${
-                          isCompact ? "w-fit" : "w-fit"
-                        }`}
-                      >
-                        {resolvedQrCodeValue ? (
-                          <QRCode
-                            value={resolvedQrCodeValue}
-                            size={isCompact ? 48 : 58}
-                            level="M"
-                            bgColor="#ffffff"
-                            fgColor="#111827"
-                          />
-                        ) : (
-                          <div className={isCompact ? "h-[48px] w-[48px] bg-stone-100" : "h-[58px] w-[58px] bg-stone-100"} />
-                        )}
-                        <p className={isCompact ? "mt-1 text-[8px] font-medium text-stone-500" : "mt-1 text-[9px] font-medium text-stone-500"}>
-                          {qrCodeLabel}
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  signatures.map((signature) => {
-                    const resolvedName = signature.name?.trim();
-                    const shouldShowName = Boolean(
-                      resolvedName || signature.showPlaceholderWhenNameMissing !== false
-                    );
-
-                    return (
-                      <div
-                        key={signature.label}
-                        className={isCompact ? "space-y-2 text-center" : "space-y-3 text-center"}
-                      >
-                        <div
-                          className={`mx-auto h-px w-full border-t border-dashed border-stone-500 ${
-                            isCompact ? "max-w-[180px]" : "max-w-[220px]"
-                          }`}
-                        />
-                        <div className={isCompact ? "space-y-0.5 leading-6" : "space-y-1 leading-7"}>
-                          {signatureNamePlacement === "below" ? (
-                            <>
-                              <p className={isCompact ? "text-[13px] text-stone-700" : "text-sm text-stone-700"}>
-                                {signature.label}
-                              </p>
-                              {shouldShowName ? (
-                                <p className={isCompact ? "text-[14px] font-semibold text-stone-900" : "text-[15px] font-semibold text-stone-900"}>
-                                  {resolvedName || "........................"}
-                                </p>
-                              ) : null}
-                            </>
-                          ) : (
-                            <>
-                              {shouldShowName ? (
-                                <p className={isCompact ? "text-[14px] font-semibold text-stone-900" : "text-[15px] font-semibold text-stone-900"}>
-                                  {resolvedName || "........................"}
-                                </p>
-                              ) : null}
-                              <p className={isCompact ? "text-[13px] text-stone-700" : "text-sm text-stone-700"}>
-                                {signature.label}
-                              </p>
-                            </>
-                          )}
-                          {signature.note ? (
-                            <p className={isCompact ? "text-[11px] leading-5 text-stone-500" : "text-xs leading-6 text-stone-500"}>
-                              {signature.note}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </section>
+                    })
+                  )}
+                </section>
+              ) : null}
 
               {appendixSections.length ? (
                 <section
