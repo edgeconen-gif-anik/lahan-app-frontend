@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import { useApproveContract, useContract, useUpdateContract } from "@/hooks/contract/useContracts";
+import { useProject } from "@/hooks/project/useProjects";
 import type { UpdateContractPayload } from "@/lib/schema/contract/contract";
 import {
   buildAgreementDraftFromContract,
@@ -43,7 +44,9 @@ function formatBsDate(iso?: string | null): string {
 
 function formatCurrency(amount?: number | string | null): string {
   if (amount == null || amount === "") return "—";
-  return "रू " + Number(amount).toLocaleString("en-IN");
+  const numericAmount = Number(amount);
+  if (Number.isNaN(numericAmount)) return "—";
+  return "रू " + numericAmount.toLocaleString("en-IN");
 }
 
 function daysBetween(a: Date, b: Date): number {
@@ -502,10 +505,151 @@ function InfoRow({ label, value, accent }: {
   return (
     <div className="flex items-start justify-between gap-4 py-2.5 border-b last:border-0">
       <span className="text-sm text-muted-foreground shrink-0">{label}</span>
-      <span className={`text-sm font-medium text-right ${accent ? "text-primary" : ""}`}>
+      <div className={`text-sm font-medium text-right ${accent ? "text-primary" : ""}`}>
         {value ?? "—"}
-      </span>
+      </div>
     </div>
+  );
+}
+
+function AmountFigureCard({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: "neutral" | "primary" | "success";
+}) {
+  const toneClass = {
+    neutral: "border-slate-200 bg-card",
+    primary: "border-primary/25 bg-primary/5",
+    success: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20",
+  }[tone];
+
+  const valueClass = {
+    neutral: "text-foreground",
+    primary: "text-primary",
+    success: "text-emerald-700 dark:text-emerald-300",
+  }[tone];
+
+  return (
+    <div className={`rounded-xl border p-4 shadow-sm ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+      <div className={`mt-2 text-xl font-bold ${valueClass}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function FinalEvaluatedAmountControl({
+  amount,
+  canEdit,
+  contractId,
+}: {
+  amount?: number | null;
+  canEdit: boolean;
+  contractId: string;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState(() =>
+    amount != null ? String(Number(amount)) : ""
+  );
+  const [error, setError] = useState<string | null>(null);
+  const { mutateAsync: updateContract, isPending } = useUpdateContract();
+
+  const handleCancel = () => {
+    setValue(amount != null ? String(Number(amount)) : "");
+    setError(null);
+    setIsEditing(false);
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+
+    const nextAmount = Number(value);
+    if (!value.trim() || Number.isNaN(nextAmount) || nextAmount <= 0) {
+      setError("Enter a valid amount.");
+      return;
+    }
+
+    try {
+      await updateContract({
+        id: contractId,
+        data: { finalEvaluatedAmount: nextAmount },
+      });
+      setIsEditing(false);
+    } catch {
+      setError("Could not update amount.");
+    }
+  };
+
+  if (!canEdit) {
+    return amount != null
+      ? formatCurrency(amount)
+      : <span className="text-muted-foreground italic text-xs">Not recorded yet</span>;
+  }
+
+  if (!isEditing) {
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span>
+          {amount != null
+            ? formatCurrency(amount)
+            : <span className="text-muted-foreground italic text-xs">Not recorded yet</span>}
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setValue(amount != null ? String(Number(amount)) : "");
+            setError(null);
+            setIsEditing(true);
+          }}
+          className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+        >
+          <Pencil size={12} />
+          Correct
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <input
+          type="number"
+          min="1"
+          step="0.01"
+          aria-label="Final evaluated amount"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          disabled={isPending}
+          className="w-36 rounded-md border bg-background px-2 py-1 text-right font-mono text-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+        />
+        <button
+          type="submit"
+          disabled={isPending}
+          className="inline-flex items-center gap-1 rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={isPending}
+          className="rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Cancel
+        </button>
+      </div>
+      {error && <p className="text-xs font-medium text-destructive">{error}</p>}
+    </form>
   );
 }
 
@@ -631,6 +775,7 @@ export default function ContractDetailPage() {
   const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
 
   const { data: contract, isLoading, error } = useContract(id as string);
+  const { data: project } = useProject(contract?.projectId ?? "");
 
   if (isLoading) {
     return (
@@ -654,6 +799,7 @@ export default function ContractDetailPage() {
   }
 
   const displayStatus = (localStatus ?? contract.status) as ContractStatus;
+  const isCompleted = displayStatus === "COMPLETED";
   const health        = getTimeHealth({ ...contract, status: displayStatus });
   const openDocumentPrint = (path: string) => {
     window.open(`${path}?print=1`, "_blank", "noopener,noreferrer");
@@ -671,6 +817,8 @@ export default function ContractDetailPage() {
   const agreementAmount = contract.agreement?.amount ?? contract.contractAmount;
   const workOrderCompletionDate =
     contract.workOrder?.workCompletionDate ?? contract.intendedCompletionDate;
+  const allocatedAmount = project?.allocatedBudget;
+  const canCorrectFinalEvaluatedAmount = isAdmin && isCompleted;
 
   const implementor = contract.company
     ? { type: "company"   as const, name: contract.company.name, sub: contract.company.panNumber ? `PAN: ${contract.company.panNumber}` : undefined }
@@ -719,13 +867,15 @@ export default function ContractDetailPage() {
             <ClipboardList size={13} />
             Work-Order Page
           </button>
-          <button
-            onClick={() => router.push(`/dashboard/contracts/${id}/contract-update`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
-          >
-            <CheckSquare size={13} />
-            Contract Update
-          </button>
+          {(!isCompleted || isAdmin) && (
+            <button
+              onClick={() => router.push(`/dashboard/contracts/${id}/contract-update`)}
+              className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              {isCompleted ? <Pencil size={13} /> : <CheckSquare size={13} />}
+              {isCompleted ? "Edit Final Amount" : "Contract Update"}
+            </button>
+          )}
           <StatusUpdater
             currentStatus={displayStatus}
             contractId={id as string}
@@ -741,6 +891,29 @@ export default function ContractDetailPage() {
         </div>
       </div>
 
+      {isCompleted && (
+        <div className="grid gap-3 md:grid-cols-3">
+          <AmountFigureCard
+            label="Allocated Amount"
+            value={allocatedAmount != null ? formatCurrency(allocatedAmount) : "—"}
+          />
+          <AmountFigureCard
+            label="Contract Amount"
+            tone="primary"
+            value={formatCurrency(contract.contractAmount)}
+          />
+          <AmountFigureCard
+            label="Final Evaluated Amount"
+            tone="success"
+            value={
+              contract.finalEvaluatedAmount != null
+                ? formatCurrency(contract.finalEvaluatedAmount)
+                : "Not recorded"
+            }
+          />
+        </div>
+      )}
+
       {/* ── Timeline ── */}
       <Section title="Project Timeline" icon={<CalendarDays size={16} />}>
         <ContractTimeline contract={contract} />
@@ -755,9 +928,11 @@ export default function ContractDetailPage() {
         <InfoRow
           label="Final Evaluated Amount"
           value={
-            contract.finalEvaluatedAmount != null
-              ? formatCurrency(contract.finalEvaluatedAmount)
-              : <span className="text-muted-foreground italic text-xs">Not recorded yet</span>
+            <FinalEvaluatedAmountControl
+              amount={contract.finalEvaluatedAmount}
+              canEdit={canCorrectFinalEvaluatedAmount}
+              contractId={contract.id}
+            />
           }
         />
         <InfoRow label="Start Date (BS)" value={formatBsDate(contract.startDate)} />

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -15,6 +16,22 @@ import {
 } from "@/hooks/contract/useContracts";
 import { CONTRACT_STATUS_LABEL } from "@/components/contract-status-badge";
 import { toNepaliDate } from "@/lib/date-utils";
+import type { Contract } from "@/lib/schema/contract/contract";
+
+type CompletionDraft = {
+  contractId: string;
+  finalEvaluatedAmount: string;
+  actualCompletionDate: string;
+  completionCode: string | null;
+};
+
+type MutationError = {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+};
 
 function toDateInput(value?: string | null) {
   if (!value) return "";
@@ -40,9 +57,22 @@ function formatCurrency(value?: number | null) {
   return `रू ${Number(value).toLocaleString("en-IN")}`;
 }
 
+function buildCompletionDraft(contract: Contract, contractId: string): CompletionDraft {
+  return {
+    contractId,
+    finalEvaluatedAmount:
+      contract.finalEvaluatedAmount != null
+        ? String(Number(contract.finalEvaluatedAmount))
+        : "",
+    actualCompletionDate: toDateInput(contract.actualCompletionDate),
+    completionCode: contract.completionCode ?? null,
+  };
+}
+
 export default function ContractUpdatePage() {
   const params = useParams();
   const router = useRouter();
+  const { data: session } = useSession();
   const contractId = params.id as string;
 
   const { data: contract, isLoading, error } = useContract(contractId);
@@ -51,22 +81,32 @@ export default function ContractUpdatePage() {
     isPending: isSubmitting,
   } = useProjectUpdateContract();
 
-  const [finalEvaluatedAmount, setFinalEvaluatedAmount] = useState("");
-  const [actualCompletionDate, setActualCompletionDate] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [completionCode, setCompletionCode] = useState<string | null>(null);
+  const [draft, setDraft] = useState<CompletionDraft | null>(null);
+  const contractDraft = useMemo(
+    () => (contract ? buildCompletionDraft(contract, contractId) : null),
+    [contract, contractId]
+  );
+  const activeDraft = draft?.contractId === contractId ? draft : contractDraft;
+  const finalEvaluatedAmount = activeDraft?.finalEvaluatedAmount ?? "";
+  const actualCompletionDate = activeDraft?.actualCompletionDate ?? "";
+  const completionCode = activeDraft?.completionCode ?? null;
 
-  useEffect(() => {
-    if (!contract) return;
+  const updateDraft = (
+    updates: Partial<Omit<CompletionDraft, "contractId">>
+  ) => {
+    const fallback = contractDraft ?? {
+      contractId,
+      finalEvaluatedAmount: "",
+      actualCompletionDate: "",
+      completionCode: null,
+    };
 
-    setFinalEvaluatedAmount(
-      contract.finalEvaluatedAmount != null
-        ? String(Number(contract.finalEvaluatedAmount))
-        : ""
-    );
-    setActualCompletionDate(toDateInput(contract.actualCompletionDate));
-    setCompletionCode(contract.completionCode ?? null);
-  }, [contract]);
+    setDraft((current) => ({
+      ...(current?.contractId === contractId ? current : fallback),
+      ...updates,
+    }));
+  };
 
   const helperDateText = useMemo(() => {
     if (!actualCompletionDate) return "Leave blank to use today's date automatically.";
@@ -106,11 +146,18 @@ export default function ContractUpdatePage() {
 
   const isArchived = contract.status === "ARCHIVED";
   const isCompleted = contract.status === "COMPLETED";
+  const isAdmin = session?.user?.role === "ADMIN";
+  const canEditCompletedContract = !isCompleted || isAdmin;
   const activeCompletionCode = completionCode ?? contract.completionCode ?? null;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError(null);
+
+    if (!canEditCompletedContract) {
+      setSubmitError("Only admins can update the final evaluated amount after completion.");
+      return;
+    }
 
     const amount = Number(finalEvaluatedAmount);
     if (!finalEvaluatedAmount.trim() || Number.isNaN(amount) || amount <= 0) {
@@ -127,15 +174,9 @@ export default function ContractUpdatePage() {
         },
       });
 
-      setCompletionCode(updatedContract.completionCode ?? null);
-      setActualCompletionDate(toDateInput(updatedContract.actualCompletionDate));
-      setFinalEvaluatedAmount(
-        updatedContract.finalEvaluatedAmount != null
-          ? String(Number(updatedContract.finalEvaluatedAmount))
-          : finalEvaluatedAmount
-      );
-    } catch (mutationError: any) {
-      const message = mutationError?.response?.data?.message;
+      setDraft(buildCompletionDraft(updatedContract, contractId));
+    } catch (mutationError: unknown) {
+      const message = (mutationError as MutationError)?.response?.data?.message;
       setSubmitError(Array.isArray(message) ? message.join(", ") : message ?? "Failed to complete the contract.");
     }
   };
@@ -153,10 +194,15 @@ export default function ContractUpdatePage() {
             Back to contract
           </button>
           <div className="space-y-1.5">
-            <h1 className="text-2xl font-bold tracking-tight">Contract Update</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {isCompleted ? "Final Evaluated Correction" : "Contract Update"}
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Enter the final evaluated amount to complete this contract and generate
-              its completion code for manual paperwork.
+              {isCompleted
+                ? isAdmin
+                  ? "Correct the recorded final evaluated amount for this completed contract."
+                  : "This completed contract can only be corrected by an admin."
+                : "Enter the final evaluated amount to complete this contract and generate its completion code for manual paperwork."}
             </p>
           </div>
         </div>
@@ -205,17 +251,25 @@ export default function ContractUpdatePage() {
         >
           <div className="space-y-1.5">
             <h2 className="text-lg font-semibold text-foreground">
-              Completion Entry
+              {isCompleted ? "Admin Correction" : "Completion Entry"}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Submitting this form updates the contract status to completed automatically.
+              {isCompleted
+                ? "Saving here updates only the recorded completion figures."
+                : "Submitting this form updates the contract status to completed automatically."}
             </p>
           </div>
 
-          {isCompleted && (
+          {isCompleted && isAdmin && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
               This contract is already completed. Saving again will keep the same
               completion code and update the recorded final amount/date.
+            </div>
+          )}
+
+          {isCompleted && !isAdmin && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              This contract is completed. Only admins can correct the final evaluated amount.
             </div>
           )}
 
@@ -241,8 +295,10 @@ export default function ContractUpdatePage() {
                 min="1"
                 step="0.01"
                 value={finalEvaluatedAmount}
-                onChange={(event) => setFinalEvaluatedAmount(event.target.value)}
-                disabled={isArchived || isSubmitting}
+                onChange={(event) =>
+                  updateDraft({ finalEvaluatedAmount: event.target.value })
+                }
+                disabled={isArchived || isSubmitting || !canEditCompletedContract}
                 className="w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
                 placeholder="Enter final evaluated amount"
               />
@@ -255,8 +311,10 @@ export default function ContractUpdatePage() {
               <input
                 type="date"
                 value={actualCompletionDate}
-                onChange={(event) => setActualCompletionDate(event.target.value)}
-                disabled={isArchived || isSubmitting}
+                onChange={(event) =>
+                  updateDraft({ actualCompletionDate: event.target.value })
+                }
+                disabled={isArchived || isSubmitting || !canEditCompletedContract}
                 className="w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
               />
               <span className="block text-xs text-muted-foreground">
@@ -266,8 +324,9 @@ export default function ContractUpdatePage() {
           </div>
 
           <div className="rounded-2xl border bg-muted/30 p-4 text-sm text-muted-foreground">
-            The generated completion code can be copied into the final manual
-            completion report after this contract is marked complete.
+            {isCompleted
+              ? "The existing completion code stays unchanged while the recorded final amount is corrected."
+              : "The generated completion code can be copied into the final manual completion report after this contract is marked complete."}
           </div>
 
           <div className="flex flex-wrap justify-end gap-3 pt-2">
@@ -280,7 +339,7 @@ export default function ContractUpdatePage() {
             </button>
             <button
               type="submit"
-              disabled={isArchived || isSubmitting}
+              disabled={isArchived || isSubmitting || !canEditCompletedContract}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? (
@@ -291,7 +350,7 @@ export default function ContractUpdatePage() {
               ) : (
                 <>
                   <BadgeCheck size={16} />
-                  {isCompleted ? "Save Completion Update" : "Mark as Completed"}
+                  {isCompleted ? "Save Admin Correction" : "Mark as Completed"}
                 </>
               )}
             </button>
