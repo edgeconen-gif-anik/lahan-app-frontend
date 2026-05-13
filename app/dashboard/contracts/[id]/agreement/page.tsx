@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { NepaliOfficialDocument } from "@/components/contracts/nepali-official-document";
 import { useCompany } from "@/hooks/company/useCompany";
 import { useContract } from "@/hooks/contract/useContracts";
@@ -316,7 +317,22 @@ function UnavailableState() {
   );
 }
 
-export default function AgreementPage() {
+function AgreementLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] px-4 py-8">
+      <div className="mx-auto max-w-5xl space-y-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-28 animate-pulse rounded-[24px] border border-slate-200 bg-white/80"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AgreementContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const contractId = params.id as string;
@@ -463,5 +479,13 @@ export default function AgreementPage() {
       subtitle={EMPLOYER_NAME}
       title={isCompanyAgreement ? "सम्झौता फारम" : "सम्झौता पत्र"}
     />
+  );
+}
+
+export default function AgreementPage() {
+  return (
+    <Suspense fallback={<AgreementLoadingFallback />}>
+      <AgreementContent />
+    </Suspense>
   );
 }

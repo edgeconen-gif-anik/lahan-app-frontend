@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { NepaliOfficialDocument } from "@/components/contracts/nepali-official-document";
 import { useCompany } from "@/hooks/company/useCompany";
 import { useContract } from "@/hooks/contract/useContracts";
@@ -50,7 +51,22 @@ function splitWorkOrderContent(value: string) {
     .filter(Boolean);
 }
 
-export default function WorkOrderPage() {
+function WorkOrderLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] px-4 py-8">
+      <div className="mx-auto max-w-5xl space-y-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-28 animate-pulse rounded-[24px] border border-slate-200 bg-white/80"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const contractId = params.id as string;
@@ -159,5 +175,13 @@ export default function WorkOrderPage() {
       subjectPrefix="बिषय:-"
       title=""
     />
+  );
+}
+
+export default function WorkOrderPage() {
+  return (
+    <Suspense fallback={<WorkOrderLoadingFallback />}>
+      <WorkOrderContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -382,7 +382,20 @@ function ContractRow({
   );
 }
 
-export default function ContractLandingPage() {
+function ContractsLoadingFallback() {
+  return (
+    <div className="space-y-6 p-6">
+      <div>
+        <div className="h-9 w-72 animate-pulse rounded-md bg-muted" />
+        <div className="mt-2 h-5 w-[32rem] max-w-full animate-pulse rounded-md bg-muted" />
+      </div>
+      <div className="h-32 animate-pulse rounded-xl border bg-card" />
+      <div className="h-96 animate-pulse rounded-xl border bg-card" />
+    </div>
+  );
+}
+
+function ContractLandingContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -662,5 +675,13 @@ export default function ContractLandingPage() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function ContractLandingPage() {
+  return (
+    <Suspense fallback={<ContractsLoadingFallback />}>
+      <ContractLandingContent />
+    </Suspense>
   );
 }
