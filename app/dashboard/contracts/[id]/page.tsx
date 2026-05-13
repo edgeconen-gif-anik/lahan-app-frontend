@@ -157,10 +157,14 @@ function TimeHealthBadge({ health }: { health: ReturnType<typeof getTimeHealth> 
 function StatusUpdater({
   currentStatus,
   contractId,
+  canUpdateStatus,
+  disabledReason,
   onUpdated,
 }: {
   currentStatus?: string;
   contractId: string;
+  canUpdateStatus: boolean;
+  disabledReason?: string;
   onUpdated: (newStatus: ContractStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -178,7 +182,28 @@ function StatusUpdater({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const getStatusBlockReason = (status: ContractStatus) => {
+    if (!canUpdateStatus) return disabledReason ?? "Status update is unavailable.";
+    if (status === currentStatus) return null;
+    if (currentStatus === "ARCHIVED") return "Archived contracts cannot move to another milestone.";
+    if (status === "ARCHIVED") return null;
+
+    const currentIndex = STATUS_ORDER.indexOf(currentStatus as ContractStatus);
+    const nextIndex = STATUS_ORDER.indexOf(status);
+
+    if (currentIndex === -1 || nextIndex === -1) {
+      return "This milestone is not supported for this contract.";
+    }
+
+    if (nextIndex < currentIndex) {
+      return "Contract milestone cannot move backwards.";
+    }
+
+    return null;
+  };
+
   const handleSelect = async (status: ContractStatus) => {
+    if (getStatusBlockReason(status)) return;
     if (status === currentStatus) { setOpen(false); return; }
     if (status === "COMPLETED") {
       setOpen(false);
@@ -193,8 +218,8 @@ function StatusUpdater({
 
       await updateContract({ id: contractId, data: statusUpdate });
       onUpdated(status);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // useUpdateContract already surfaces the backend message via toast.
     } finally {
       setSaving(false);
       setOpen(false);
@@ -205,7 +230,8 @@ function StatusUpdater({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((p) => !p)}
-        disabled={saving}
+        disabled={saving || !canUpdateStatus}
+        title={disabledReason}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-background text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
       >
         {saving ? <Loader2 size={13} className="animate-spin" /> : <Pencil size={13} />}
@@ -222,12 +248,16 @@ function StatusUpdater({
             {STATUS_ORDER.map((s) => {
               const cfg = STATUS_CONFIG[s];
               const isActive = s === currentStatus;
+              const blockReason = getStatusBlockReason(s);
               return (
                 <button
                   key={s}
                   onClick={() => handleSelect(s)}
+                  disabled={Boolean(blockReason)}
+                  title={blockReason ?? undefined}
                   className={`w-full flex items-center gap-2 px-2.5 py-2 text-sm rounded-lg transition-colors text-left
-                    ${isActive ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent"}`}
+                    ${isActive ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent"}
+                    ${blockReason ? "cursor-not-allowed opacity-50 hover:bg-transparent" : ""}`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
                   {cfg.label}
@@ -237,6 +267,11 @@ function StatusUpdater({
             })}
           </div>
         </div>
+      )}
+      {disabledReason && (
+        <p className="mt-1 max-w-52 text-right text-[11px] leading-4 text-muted-foreground">
+          {disabledReason}
+        </p>
       )}
     </div>
   );
@@ -819,6 +854,12 @@ export default function ContractDetailPage() {
     contract.workOrder?.workCompletionDate ?? contract.intendedCompletionDate;
   const allocatedAmount = project?.allocatedBudget;
   const canCorrectFinalEvaluatedAmount = isAdmin && isCompleted;
+  const canUpdateStatus = isAdmin && contract.approvalStatus === "APPROVED";
+  const statusUpdateDisabledReason = !isAdmin
+    ? "Only admins can update contract status."
+    : contract.approvalStatus !== "APPROVED"
+      ? "Approve this contract before updating status."
+      : undefined;
 
   const implementor = contract.company
     ? { type: "company"   as const, name: contract.company.name, sub: contract.company.panNumber ? `PAN: ${contract.company.panNumber}` : undefined }
@@ -879,6 +920,8 @@ export default function ContractDetailPage() {
           <StatusUpdater
             currentStatus={displayStatus}
             contractId={id as string}
+            canUpdateStatus={canUpdateStatus}
+            disabledReason={statusUpdateDisabledReason}
             onUpdated={setLocalStatus}
           />
           <button

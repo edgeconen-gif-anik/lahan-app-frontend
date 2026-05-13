@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
@@ -31,8 +31,53 @@ import { toNepaliDate } from "@/lib/date-utils";
 import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
 
 type ImplementationFilter = "ALL" | "COMPANY" | "USER_COMMITTEE";
+type StatusFilter = "ALL" | ContractStatus;
 
 type TimeHealth = "not_started" | "ongoing" | "overdue" | "completed" | "archived";
+
+const ACTIVE_CONTRACT_STATUS_ORDER = CONTRACT_STATUS_ORDER.filter(
+  (status) => status !== "ARCHIVED"
+);
+
+function isContractStatus(value: string | null): value is ContractStatus {
+  return CONTRACT_STATUS_ORDER.includes(value as ContractStatus);
+}
+
+function getStatusChangeBlockReason(contract: Contract, nextStatus: ContractStatus) {
+  if (contract.status === nextStatus) return null;
+  if (contract.status === "ARCHIVED") {
+    return "Archived contracts cannot move to another milestone.";
+  }
+  if (nextStatus === "ARCHIVED") return null;
+
+  const currentIndex = ACTIVE_CONTRACT_STATUS_ORDER.indexOf(contract.status);
+  const nextIndex = ACTIVE_CONTRACT_STATUS_ORDER.indexOf(nextStatus);
+
+  if (currentIndex === -1 || nextIndex === -1) {
+    return "This milestone is not supported for this contract.";
+  }
+
+  if (nextIndex < currentIndex) {
+    return "Contract milestone cannot move backwards.";
+  }
+
+  if (nextStatus === "COMPLETED" && contract.finalEvaluatedAmount == null) {
+    return "Final evaluated amount is required before marking completed.";
+  }
+
+  return null;
+}
+
+function getNextStatusBlockReason(contract: Contract) {
+  if (contract.status === "ARCHIVED") {
+    return getStatusChangeBlockReason(contract, "NOT_STARTED");
+  }
+
+  const currentIndex = ACTIVE_CONTRACT_STATUS_ORDER.indexOf(contract.status);
+  const nextStatus = ACTIVE_CONTRACT_STATUS_ORDER[currentIndex + 1];
+
+  return nextStatus ? getStatusChangeBlockReason(contract, nextStatus) : null;
+}
 
 function getTimeHealth(contract: Pick<Contract, "startDate" | "intendedCompletionDate" | "actualCompletionDate" | "status">): TimeHealth {
   if (contract.status === "ARCHIVED") return "archived";
@@ -132,18 +177,31 @@ function StatusCard({
   label,
   value,
   accent,
+  isActive,
+  onClick,
 }: {
   label: string;
   value: number;
   accent?: string;
+  isActive: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="rounded-xl border bg-card px-4 py-3">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={isActive}
+      className={`rounded-xl border bg-card px-4 py-3 text-left transition hover:border-primary/50 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        isActive ? "border-primary bg-primary/5 shadow-sm" : ""
+      }`}
+    >
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className={`mt-2 text-2xl font-bold ${accent ?? ""}`}>{value}</p>
-    </div>
+      <p className={`mt-2 text-2xl font-bold ${isActive ? "text-primary" : (accent ?? "")}`}>
+        {value}
+      </p>
+    </button>
   );
 }
 
@@ -165,6 +223,7 @@ function ContractRow({
   onStatusChange: (status: ContractStatus) => void;
 }) {
   const canChangeStatus = isAdmin && contract.approvalStatus === "APPROVED";
+  const statusBlockReason = canChangeStatus ? getNextStatusBlockReason(contract) : null;
   const implementor = contract.company
     ? {
         icon: <Building2 className="h-4 w-4 text-blue-500" />,
@@ -235,14 +294,23 @@ function ContractRow({
               onChange={(event) => onStatusChange(event.target.value as ContractStatus)}
               className="h-9 rounded-md border bg-background px-3 text-sm"
             >
-              {CONTRACT_STATUS_ORDER.map((status) => (
-                <option key={status} value={status}>
-                  {CONTRACT_STATUS_LABEL[status]}
-                </option>
-              ))}
+              {CONTRACT_STATUS_ORDER.map((status) => {
+                const blockReason = getStatusChangeBlockReason(contract, status);
+
+                return (
+                  <option key={status} value={status} disabled={Boolean(blockReason)}>
+                    {CONTRACT_STATUS_LABEL[status]}
+                  </option>
+                );
+              })}
             </select>
           ) : (
             <ContractStatusBadge status={contract.status} />
+          )}
+          {statusBlockReason && (
+            <p className="max-w-56 text-xs leading-5 text-muted-foreground">
+              {statusBlockReason}
+            </p>
           )}
           {!canChangeStatus && isAdmin && contract.approvalStatus !== "APPROVED" && (
             <p className="text-xs text-muted-foreground">Approve first to change milestone.</p>
@@ -316,6 +384,8 @@ function ContractRow({
 
 export default function ContractLandingPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
@@ -332,11 +402,27 @@ export default function ContractLandingPage() {
   const [search, setSearch] = useState("");
   const [implementationFilter, setImplementationFilter] =
     useState<ImplementationFilter>("ALL");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | ContractStatus>("ALL");
+  const statusParam = searchParams.get("status");
+  const statusFilter: StatusFilter = isContractStatus(statusParam) ? statusParam : "ALL";
   const [contractToDelete, setContractToDelete] = useState<Contract | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const filteredContracts = useMemo(() => {
+  const setStatusFilter = (nextStatus: StatusFilter) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (nextStatus === "ALL") {
+      params.delete("status");
+    } else {
+      params.set("status", nextStatus);
+    }
+
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+      scroll: false,
+    });
+  };
+
+  const baseFilteredContracts = useMemo(() => {
     return contracts.filter((contract) => {
       const implementorName = contract.company?.name ?? contract.userCommittee?.name ?? "";
       const matchesSearch =
@@ -350,18 +436,23 @@ export default function ContractLandingPage() {
         (implementationFilter === "COMPANY" && Boolean(contract.company)) ||
         (implementationFilter === "USER_COMMITTEE" && Boolean(contract.userCommittee));
 
-      const matchesStatus =
-        statusFilter === "ALL" || contract.status === statusFilter;
-
-      return matchesSearch && matchesImplementation && matchesStatus;
+      return matchesSearch && matchesImplementation;
     });
-  }, [contracts, implementationFilter, search, statusFilter]);
+  }, [contracts, implementationFilter, search]);
+
+  const filteredContracts = useMemo(() => {
+    return baseFilteredContracts.filter((contract) => {
+      return statusFilter === "ALL" || contract.status === statusFilter;
+    });
+  }, [baseFilteredContracts, statusFilter]);
 
   const totalsByStatus = useMemo(
     () =>
       CONTRACT_STATUS_ORDER.reduce<Record<ContractStatus, number>>(
         (acc, status) => {
-          acc[status] = contracts.filter((contract) => contract.status === status).length;
+          acc[status] = baseFilteredContracts.filter(
+            (contract) => contract.status === status
+          ).length;
           return acc;
         },
         {
@@ -373,7 +464,7 @@ export default function ContractLandingPage() {
           ARCHIVED: 0,
         }
       ),
-    [contracts]
+    [baseFilteredContracts]
   );
 
   const pendingApprovals = contracts.filter(
@@ -426,12 +517,19 @@ export default function ContractLandingPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
-          <StatusCard label="Total" value={contracts.length} />
+          <StatusCard
+            label="Total"
+            value={baseFilteredContracts.length}
+            isActive={statusFilter === "ALL"}
+            onClick={() => setStatusFilter("ALL")}
+          />
           {CONTRACT_STATUS_ORDER.map((status) => (
             <StatusCard
               key={status}
               label={CONTRACT_STATUS_LABEL[status]}
               value={totalsByStatus[status]}
+              isActive={statusFilter === status}
+              onClick={() => setStatusFilter(status)}
             />
           ))}
         </div>
