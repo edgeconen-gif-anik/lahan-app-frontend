@@ -92,6 +92,10 @@ function getTimeHealth(contract: Pick<Contract, "startDate" | "intendedCompletio
   return "ongoing";
 }
 
+function formatUserName(user?: { name?: string | null; email?: string | null } | null): string {
+  return user?.name || user?.email || "Unknown user";
+}
+
 function TimeHealthBadge({ contract }: { contract: Contract }) {
   const health = getTimeHealth(contract);
 
@@ -320,7 +324,19 @@ function ContractRow({
       </td>
 
       <td className="px-4 py-4">
-        <ApprovalStatusBadge status={contract.approvalStatus} />
+        <div className="space-y-1.5">
+          <ApprovalStatusBadge status={contract.approvalStatus} />
+          {isAdmin && contract.approvalStatus !== "APPROVED" && (
+            <p className="max-w-48 text-xs leading-5 text-muted-foreground">
+              Submitted by{" "}
+              <span className="font-medium text-foreground">
+                {contract.initiatedBy
+                  ? formatUserName(contract.initiatedBy)
+                  : contract.initiatedById ?? "unknown user"}
+              </span>
+            </p>
+          )}
+        </div>
       </td>
 
       <td className="px-4 py-4">

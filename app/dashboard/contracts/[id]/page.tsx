@@ -49,6 +49,10 @@ function formatCurrency(amount?: number | string | null): string {
   return "रू " + numericAmount.toLocaleString("en-IN");
 }
 
+function formatUserName(user?: { name?: string | null; email?: string | null } | null): string {
+  return user?.name || user?.email || "Unknown user";
+}
+
 function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
@@ -1027,6 +1031,26 @@ export default function ContractDetailPage() {
             contract.approvedAt
               ? formatBsDate(contract.approvedAt)
               : <span className="text-muted-foreground italic text-xs">Not approved yet</span>
+          }
+        />
+        <InfoRow
+          label="Submitted By"
+          value={
+            contract.initiatedBy ? (
+              <span className="inline-flex items-center justify-end gap-1.5">
+                <User size={12} className="text-muted-foreground" />
+                {formatUserName(contract.initiatedBy)}
+                {contract.initiatedBy.email && contract.initiatedBy.name && (
+                  <span className="text-xs text-muted-foreground font-normal">
+                    · {contract.initiatedBy.email}
+                  </span>
+                )}
+              </span>
+            ) : contract.initiatedById ? (
+              <span className="font-mono text-xs">{contract.initiatedById}</span>
+            ) : (
+              <span className="text-muted-foreground italic text-xs">Not recorded</span>
+            )
           }
         />
         {isAdmin && (

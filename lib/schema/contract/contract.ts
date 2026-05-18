@@ -29,6 +29,7 @@ export const DesignationEnum = z.enum([
 export const EmbeddedUserSchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
+  email: z.string().nullable().optional(),
   designation: DesignationEnum.nullable().optional(),
 });
 
@@ -120,6 +121,7 @@ export const ContractSchema = z.object({
   userCommitteeId: z.string().nullable().optional(),
   userID: z.string().nullable().optional(), // ✅ userID — matches Prisma field exactly
   siteInchargeId: z.string().nullable().optional(), // ✅ added — new field on Contract
+  initiatedById: z.string().nullable().optional(),
 
   // Relations (all optional — may be null depending on contract type)
   project: ContractProjectSchema.nullable().optional(),
@@ -127,6 +129,7 @@ export const ContractSchema = z.object({
   userCommittee: ContractUserCommitteeSchema.nullable().optional(),
   user: EmbeddedUserSchema.nullable().optional(), // committee rep
   siteIncharge: EmbeddedUserSchema.nullable().optional(), // ✅ direct site incharge
+  initiatedBy: EmbeddedUserSchema.nullable().optional(),
 
   agreement: AgreementSchema.nullable().optional(),
   workOrder: WorkOrderSchema.nullable().optional(),

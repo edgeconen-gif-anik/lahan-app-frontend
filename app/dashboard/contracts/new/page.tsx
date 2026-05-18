@@ -23,7 +23,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCreateContract, useNextContractNumber } from "@/hooks/contract/useContracts";
+import { useContracts, useCreateContract, useNextContractNumber } from "@/hooks/contract/useContracts";
 import { useProjects } from "@/hooks/project/useProjects";
 import { useCompanies } from "@/hooks/company/useCompany";
 import { useUserCommittees } from "@/hooks/user-committee/useUserCommittees";
@@ -1193,6 +1193,9 @@ export default function NewContractPage() {
     search: debouncedProjectSearch,
     fiscalYear: currentFiscalYear,
   });
+  const { data: existingContracts = [] } = useContracts({
+    fiscalYear: currentFiscalYear,
+  });
   const {
     data: users,
     isError: isUsersError,
@@ -1204,17 +1207,41 @@ export default function NewContractPage() {
   });
 
   const availableProjects = extractList<ContractProjectOption>(projects);
+  const existingContractByProjectId = useMemo(
+    () =>
+      new Map(
+        existingContracts.map((contract) => [
+          contract.projectId,
+          {
+            id: contract.id,
+            contractNumber: contract.contractNumber,
+          },
+        ])
+      ),
+    [existingContracts]
+  );
 
   const projectOptions = useMemo<ComboboxOption[]>(
     () =>
-      availableProjects.map((project) => ({
-        value: project.id,
-        label: project.name,
-        sublabel: [project.sNo ? `S.No: ${project.sNo}` : null, project.fiscalYear]
-          .filter(Boolean)
-          .join(" | ") || undefined,
-      })),
-    [availableProjects]
+      availableProjects.map((project) => {
+        const existingContract = existingContractByProjectId.get(project.id);
+
+        return {
+          value: project.id,
+          label: project.name,
+          sublabel:
+            [
+              project.sNo ? `S.No: ${project.sNo}` : null,
+              project.fiscalYear,
+              existingContract
+                ? `Already contracted: ${existingContract.contractNumber}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" | ") || undefined,
+        };
+      }),
+    [availableProjects, existingContractByProjectId]
   );
 
   const companyOptions = useMemo<ComboboxOption[]>(
@@ -1267,6 +1294,9 @@ export default function NewContractPage() {
     : "Your account is automatically assigned as site incharge.";
 
   const selectedProject = projectOptions.find((option) => option.value === formData.projectId);
+  const selectedProjectExistingContract = formData.projectId
+    ? existingContractByProjectId.get(formData.projectId)
+    : undefined;
   const selectedImplementor =
     implementationBy === "COMPANY"
       ? companyOptions.find((option) => option.value === (formData.companyId ?? ""))
@@ -1364,7 +1394,14 @@ export default function NewContractPage() {
           ? undefined
           : "Contract amount must be greater than 0.";
       case "projectId":
-        return state.projectId ? undefined : "Select a project.";
+        if (!state.projectId) return "Select a project.";
+        {
+          const existingContract = existingContractByProjectId.get(state.projectId);
+          if (existingContract) {
+            return `This project already has contract ${existingContract.contractNumber}. Use the existing contract instead.`;
+          }
+        }
+        return undefined;
       case "siteInchargeId":
         return (isAdmin ? state.siteInchargeId : session?.user?.id)
           ? undefined
@@ -1753,7 +1790,9 @@ export default function NewContractPage() {
     {
       label: "Project",
       value: selectedProject?.label ?? "Project not selected",
-      detail: selectedProject?.sublabel ?? "Link the contract to a project",
+      detail: selectedProjectExistingContract
+        ? `Existing contract ${selectedProjectExistingContract.contractNumber}`
+        : selectedProject?.sublabel ?? "Link the contract to a project",
     },
     {
       label: "Documents",
