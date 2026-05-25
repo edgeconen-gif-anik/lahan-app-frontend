@@ -11,7 +11,10 @@ import {
 const BACKEND_URL =
   process.env.BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "https://lahan-app-backend.onrender.com";
+  "https://pms-backend-vcwy.onrender.com";
+
+// Render free services can take longer than 10 seconds to resume from sleep.
+const AUTH_REQUEST_TIMEOUT_MS = 60_000;
 
 function isLoopbackHost(value: string) {
   try {
@@ -70,7 +73,7 @@ const providers: NextAuthOptions["providers"] = [
             password: credentials?.password,
           },
           {
-            timeout: 10000,
+            timeout: AUTH_REQUEST_TIMEOUT_MS,
           },
         );
 
@@ -130,12 +133,18 @@ export const authOptions: NextAuthOptions = {
       }
 
       try {
-        const res = await axios.post(`${BACKEND_URL}/auth/google-login`, {
-          token: account.id_token,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        });
+        const res = await axios.post(
+          `${BACKEND_URL}/auth/google-login`,
+          {
+            token: account.id_token,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          },
+          {
+            timeout: AUTH_REQUEST_TIMEOUT_MS,
+          },
+        );
 
         const backendUser = res.data;
 
