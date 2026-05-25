@@ -60,6 +60,7 @@ export default function ForgotPasswordContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(values),
+        signal: AbortSignal.timeout(25000),
       });
 
       const data = (await response.json()) as ForgotPasswordResponse;
@@ -81,7 +82,9 @@ export default function ForgotPasswordContent() {
     } catch (error) {
       console.error("Forgot password failed:", error);
       setErrorMessage(
-        error instanceof Error
+        error instanceof DOMException && error.name === "TimeoutError"
+          ? "Email delivery timed out. Please try again."
+          : error instanceof Error
           ? error.message
           : "Unable to start password reset. Please try again.",
       );

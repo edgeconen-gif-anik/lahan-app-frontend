@@ -79,6 +79,7 @@ export default function ResetPasswordContent() {
           token,
           password: values.password,
         }),
+        signal: AbortSignal.timeout(25000),
       });
 
       const data = (await response.json()) as { message?: string };
@@ -98,7 +99,9 @@ export default function ResetPasswordContent() {
     } catch (error) {
       console.error("Reset password failed:", error);
       setErrorMessage(
-        error instanceof Error
+        error instanceof DOMException && error.name === "TimeoutError"
+          ? "Password reset timed out. Please try again."
+          : error instanceof Error
           ? error.message
           : "Reset link is invalid or expired. Please request a new one."
       );

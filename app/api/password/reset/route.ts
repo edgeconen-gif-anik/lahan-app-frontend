@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 import { getBackendUrlConfig } from "@/lib/auth/backend-url";
 
+const PASSWORD_REQUEST_TIMEOUT_MS = 20000;
+
 export async function POST(request: Request) {
   const { url, isReady, setupMessage } = getBackendUrlConfig();
 
@@ -19,6 +21,7 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type": "application/json",
       },
+      timeout: PASSWORD_REQUEST_TIMEOUT_MS,
     });
 
     return NextResponse.json(response.data, { status: response.status });
@@ -27,6 +30,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         error.response.data,
         { status: error.response.status }
+      );
+    }
+
+    if (axios.isAxiosError(error) && error.code === "ECONNABORTED") {
+      return NextResponse.json(
+        { message: "Password reset timed out. Please try again." },
+        { status: 504 }
       );
     }
 

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 import { getBackendUrlConfig } from "@/lib/auth/backend-url";
 
+const PASSWORD_REQUEST_TIMEOUT_MS = 20000;
+
 function isLoopbackHost(value: string) {
   try {
     const parsedUrl = new URL(value);
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type": "application/json",
       },
+      timeout: PASSWORD_REQUEST_TIMEOUT_MS,
     });
 
     const data = response.data as { message: string; resetUrl?: string };
@@ -44,6 +47,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         error.response.data,
         { status: error.response.status }
+      );
+    }
+
+    if (axios.isAxiosError(error) && error.code === "ECONNABORTED") {
+      return NextResponse.json(
+        { message: "Email delivery timed out. Please try again." },
+        { status: 504 }
       );
     }
 
