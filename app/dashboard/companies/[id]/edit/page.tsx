@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyForm } from "@/shared/company-form"; // ✅ Adjust path if it's in @/components/company-form
 import { useCompany, useUpdateCompany } from "@/hooks/company/useCompany";
 import { CompanyFormValues } from "@/lib/schema/company.schema";
+import { isApprovedStatus } from "@/lib/schema/approval";
 
 export default function EditCompanyPage() {
   const params = useParams();
@@ -70,6 +70,7 @@ export default function EditCompanyPage() {
     name: company.name,
     panNumber: String(company.panNumber), // Ensure it's a string for the input
     voucherNo: company.voucherNo || "",
+    officeRegistrationNumber: company.officeRegistrationNumber || "",
     category: company.category,
     address: company.address,
     contactPerson: company.contactPerson || "",
@@ -106,6 +107,7 @@ export default function EditCompanyPage() {
             onSubmit={handleSubmit} 
             isLoading={isUpdating} 
             buttonText="Save Changes" 
+            showOfficeRegistrationNumber={isApprovedStatus(company.approvalStatus)}
           />
         </CardContent>
       </Card>

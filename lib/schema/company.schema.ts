@@ -13,6 +13,7 @@ export const companySchema = z.object({
     .or(z.string().regex(/^\d{9}$/, "PAN must be exactly 9 digits")),
   address: z.string().min(5, "Address is too short"),
   voucherNo: z.string().optional(),
+  officeRegistrationNumber: z.string().trim().max(50).optional().nullable(),
   contactPerson: z.string().optional(),
   phoneNumber: z
     .union([

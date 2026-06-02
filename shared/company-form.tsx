@@ -26,9 +26,16 @@ interface CompanyFormProps {
   onSubmit: (data: CompanyFormValues) => void;
   isLoading?: boolean;
   buttonText: string;
+  showOfficeRegistrationNumber?: boolean;
 }
 
-export function CompanyForm({ defaultValues, onSubmit, isLoading = false, buttonText }: CompanyFormProps) {
+export function CompanyForm({
+  defaultValues,
+  onSubmit,
+  isLoading = false,
+  buttonText,
+  showOfficeRegistrationNumber = false,
+}: CompanyFormProps) {
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     mode: "onTouched",
@@ -39,6 +46,7 @@ export function CompanyForm({ defaultValues, onSubmit, isLoading = false, button
       category: "WORKS",
       panNumber: "",
       voucherNo: "", // ✅ ADDED default value
+      officeRegistrationNumber: "",
       contactPerson: "",
       phoneNumber: "",
       email: "",
@@ -57,6 +65,7 @@ export function CompanyForm({ defaultValues, onSubmit, isLoading = false, button
         category: "WORKS",
         panNumber: "",
         voucherNo: "", // ✅ ADDED reset value
+        officeRegistrationNumber: "",
         contactPerson: "",
         phoneNumber: "",
         email: "",
@@ -167,6 +176,29 @@ export function CompanyForm({ defaultValues, onSubmit, isLoading = false, button
                 </FormItem>
               )}
             />
+
+            {showOfficeRegistrationNumber && (
+              <FormField
+                control={form.control}
+                name="officeRegistrationNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Office Registration Number</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. 2082/83-001"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      This number appears as Suchi Darta No. on the registration certificate.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

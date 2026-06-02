@@ -128,7 +128,7 @@ export default function CompanyCertificatePage() {
           <div className='space-y-1 font-medium'>
             <p>यू.आइ.डी नं (UID): <strong className="ml-2 font-mono tracking-wider">{shortUid}</strong></p>
             <p>भौचर नं (Voucher No): <strong className="ml-2">{toNepaliDigits(company.voucherNo) || "..................."}</strong></p>
-            <p>सूची दर्ता नं: <span className='ml-2'>...................</span></p>
+            <p>सूची दर्ता नं: <strong className="ml-2">{toNepaliDigits(company.officeRegistrationNumber) || "..................."}</strong></p>
             <p>स्थायी लेखा नम्बर (PAN): <strong className="ml-2">{toNepaliDigits(company.panNumber)}</strong></p>
           </div>
 

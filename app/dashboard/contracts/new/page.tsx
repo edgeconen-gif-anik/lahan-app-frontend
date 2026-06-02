@@ -84,7 +84,6 @@ const INITIAL_FORM_DATA = {
   contractAmount: 0,
   startDate: "",
   intendedCompletionDate: "",
-  actualCompletionDate: "" as string | undefined,
   remarks: "",
   projectId: "",
   companyId: "" as string | undefined,
@@ -1365,7 +1364,6 @@ export default function NewContractPage() {
       "siteInchargeId",
       "startDate",
       "intendedCompletionDate",
-      "actualCompletionDate",
       implementationBy === "COMPANY" ? "companyId" : "userCommitteeId",
     ];
 
@@ -1417,16 +1415,6 @@ export default function NewContractPage() {
         const intendedCompletionDateAd = toAdDate(value);
         if (startDateAd && intendedCompletionDateAd && intendedCompletionDateAd <= startDateAd) {
           return "Completion date must be after the start date.";
-        }
-        return undefined;
-      }
-      case "actualCompletionDate": {
-        const value = state.actualCompletionDate?.trim() ?? "";
-        if (!value) return undefined;
-        if (!isValidBsDate(value)) return "Use a valid BS date like 2082-01-15.";
-        const actualCompletionDateAd = toAdDate(value);
-        if (startDateAd && actualCompletionDateAd && actualCompletionDateAd <= startDateAd) {
-          return "Actual completion date must be after the start date.";
         }
         return undefined;
       }
@@ -1705,9 +1693,6 @@ export default function NewContractPage() {
 
     const startDate = convertDate(formData.startDate);
     const intendedCompletionDate = convertDate(formData.intendedCompletionDate);
-    const actualCompletionDate = formData.actualCompletionDate
-      ? convertDate(formData.actualCompletionDate)
-      : undefined;
 
     if (!startDate || !intendedCompletionDate) {
       setSubmitError("Some dates could not be converted. Please review the BS dates.");
@@ -1750,7 +1735,6 @@ export default function NewContractPage() {
         contractAmount: Number(formData.contractAmount),
         startDate,
         intendedCompletionDate,
-        actualCompletionDate: actualCompletionDate ?? undefined,
         remarks: formData.remarks.trim() || undefined,
         projectId: formData.projectId,
         companyId,
@@ -2011,23 +1995,6 @@ export default function NewContractPage() {
                 onChange={handleChange}
                 required
                 error={fieldErrors.intendedCompletionDate}
-              />
-            </Field>
-
-            <Field
-              label="Actual completion date (BS)"
-              optional
-              hint="Leave blank if the contract is not complete yet."
-              error={fieldErrors.actualCompletionDate}
-              fieldPath="actualCompletionDate"
-            >
-              <BsDateInput
-                name="actualCompletionDate"
-                value={formData.actualCompletionDate ?? ""}
-                onBlur={() => markTouched("actualCompletionDate")}
-                onChange={handleChange}
-                placeholder="Optional completion date"
-                error={fieldErrors.actualCompletionDate}
               />
             </Field>
 
