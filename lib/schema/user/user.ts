@@ -18,6 +18,7 @@ export const DesignationEnum = z.enum([
 ]);
 
 export const RoleEnum = z.enum(["CREATOR", "REVIEWER", "ADMIN"]);
+export const ApprovalStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED"]);
 
 export const ProjectStatusEnum = z.enum([
   "NOT_STARTED",
@@ -37,6 +38,7 @@ export const ContractStatusEnum = z.enum([
 
 export type Designation = z.infer<typeof DesignationEnum>;
 export type Role        = z.infer<typeof RoleEnum>;
+export type ApprovalStatus = z.infer<typeof ApprovalStatusEnum>;
 
 // ─── Embedded shapes ─────────────────────────────────────────────────────────
 
@@ -133,6 +135,7 @@ export const UserListItemSchema = z.object({
   email:         z.string().nullable(),
   role:          RoleEnum.nullable().optional(),
   designation:   DesignationEnum.nullable().optional(),
+  approvalStatus: ApprovalStatusEnum.optional(),
   image:         z.string().nullable().optional(),
   createdAt:     z.string(),
   updatedAt:     z.string(),
@@ -147,6 +150,7 @@ export const UserProfileSchema = z.object({
   email:       z.string().nullable(),
   role:        RoleEnum.nullable().optional(),
   designation: DesignationEnum.nullable().optional(),
+  approvalStatus: ApprovalStatusEnum.optional(),
   image:       z.string().nullable().optional(),
   createdAt:   z.string(),
   summary:     ProfileSummarySchema,

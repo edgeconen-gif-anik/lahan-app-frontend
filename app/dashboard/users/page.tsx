@@ -4,7 +4,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useUsers } from "@/hooks/user/useUsers";
+import { useApproveUser, useUsers } from "@/hooks/user/useUsers";
 import {
   Search,
   UserCircle,
@@ -16,6 +16,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { UserListItem, Designation, Role } from "@/lib/schema/user/user";
+import { toast } from "sonner";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,12 @@ const ROLE_COLOR: Record<Role, string> = {
   CREATOR:  "bg-blue-100 text-blue-700",
   REVIEWER: "bg-yellow-100 text-yellow-700",
   ADMIN:    "bg-purple-100 text-purple-700",
+};
+
+const APPROVAL_COLOR: Record<string, string> = {
+  PENDING: "bg-amber-100 text-amber-700",
+  APPROVED: "bg-green-100 text-green-700",
+  REJECTED: "bg-red-100 text-red-700",
 };
 
 function UserAvatar({ name, image }: { name?: string | null; image?: string | null }) {
@@ -67,6 +74,7 @@ export default function UsersPage() {
   const [search,      setSearch]      = useState("");
   const [designation, setDesignation] = useState("");
   const [role,        setRole]        = useState("");
+  const [approvalStatus, setApprovalStatus] = useState("");
   const [page,        setPage]        = useState(1);
   const LIMIT = 12;
 
@@ -75,6 +83,7 @@ export default function UsersPage() {
       search:      search      || undefined,
       designation: designation || undefined,
       role:        role        || undefined,
+      approvalStatus: approvalStatus || undefined,
       page,
       limit: LIMIT,
     },
@@ -89,6 +98,10 @@ export default function UsersPage() {
   const handleSearch      = (v: string) => { setSearch(v);      setPage(1); };
   const handleDesignation = (v: string) => { setDesignation(v); setPage(1); };
   const handleRole        = (v: string) => { setRole(v);        setPage(1); };
+  const handleApprovalStatus = (v: string) => {
+    setApprovalStatus(v);
+    setPage(1);
+  };
 
   if (status === "loading") {
     return (
@@ -160,6 +173,17 @@ export default function UsersPage() {
           <option value="REVIEWER">Reviewer</option>
           <option value="ADMIN">Admin</option>
         </select>
+
+        <select
+          value={approvalStatus}
+          onChange={(e) => handleApprovalStatus(e.target.value)}
+          className="px-3 py-2 border rounded-md bg-background text-sm"
+        >
+          <option value="">All Approval</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
       </div>
 
       {/* ── Loading ── */}
@@ -227,9 +251,40 @@ export default function UsersPage() {
 // ─── UserCard component ───────────────────────────────────────────────────────
 
 function UserCard({ user, onClick }: { user: UserListItem; onClick: () => void }) {
+  const approveUser = useApproveUser();
+  const [approvalRole, setApprovalRole] = useState<Role>("CREATOR");
+  const [approvalDesignation, setApprovalDesignation] =
+    useState<Designation>("SUB_ENGINEER");
+  const isPending = user.approvalStatus === "PENDING";
+  const canApprove = isPending && Boolean(user.emailVerified);
+
+  const handleApprove = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+
+    try {
+      await approveUser.mutateAsync({
+        id: user.id,
+        payload: {
+          role: approvalRole,
+          designation: approvalDesignation,
+        },
+      });
+      toast.success("User approved successfully.");
+    } catch {
+      toast.error("Unable to approve user.");
+    }
+  };
+
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          onClick();
+        }
+      }}
       className="text-left w-full bg-card border rounded-lg p-4 hover:shadow-md hover:border-primary/40 transition-all space-y-3"
     >
       <div className="flex items-center gap-3">
@@ -253,7 +308,63 @@ function UserCard({ user, onClick }: { user: UserListItem; onClick: () => void }
             {ROLE_LABEL[user.role]}
           </span>
         )}
+        {user.approvalStatus && (
+          <span
+            className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+              APPROVAL_COLOR[user.approvalStatus] ?? "bg-muted"
+            }`}
+          >
+            {user.approvalStatus}
+          </span>
+        )}
+        {!user.emailVerified && (
+          <span className="inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+            Email not verified
+          </span>
+        )}
       </div>
-    </button>
+
+      {isPending && (
+        <div
+          className="space-y-2 border-t pt-3"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={approvalRole}
+              onChange={(event) => setApprovalRole(event.target.value as Role)}
+              className="min-w-0 rounded-md border bg-background px-2 py-1.5 text-xs"
+            >
+              <option value="CREATOR">Creator</option>
+              <option value="REVIEWER">Reviewer</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+            <select
+              value={approvalDesignation}
+              onChange={(event) =>
+                setApprovalDesignation(event.target.value as Designation)
+              }
+              className="min-w-0 rounded-md border bg-background px-2 py-1.5 text-xs"
+            >
+              <option value="ASSISTANT_SUB_ENGINEER">Asst. Sub-Engineer</option>
+              <option value="SUB_ENGINEER">Sub-Engineer</option>
+              <option value="ENGINEER">Engineer</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={handleApprove}
+            disabled={!canApprove || approveUser.isPending}
+            className="w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {approveUser.isPending
+              ? "Approving..."
+              : canApprove
+                ? "Approve user"
+                : "Waiting for email verification"}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

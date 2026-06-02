@@ -1,6 +1,8 @@
 // lib/services/user/userService.ts
 import api from "@/lib/api"; // ✅ uses your axios instance with auth interceptor
 import {
+  Designation,
+  Role,
   UserListResponse,
   UserProfile,
   UserDashboard,
@@ -14,6 +16,7 @@ export interface UserListParams {
   search?:      string;
   designation?: string;
   role?:        string;
+  approvalStatus?: string;
   page?:        number;
   limit?:       number;
 }
@@ -43,6 +46,11 @@ export const userService = {
   // GET /users/:id
   async getOne(id: string) {
     const { data } = await api.get(`/users/${id}`);
+    return data;
+  },
+
+  async approve(id: string, payload: { role: Role; designation: Designation }) {
+    const { data } = await api.patch(`/users/${id}/approve`, payload);
     return data;
   },
 };

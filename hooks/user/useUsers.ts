@@ -1,6 +1,7 @@
 // hooks/user/useUsers.ts
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { userService, UserListParams } from "@/services/user/user.service"
+import type { Designation, Role } from "@/lib/schema/user/user";
 
 // ─── Query key factory ────────────────────────────────────────────────────────
 export const userKeys = {
@@ -41,5 +42,22 @@ export function useUserDashboard(id: string) {
     queryFn:  () => userService.getDashboard(id),
     enabled:  !!id,
     staleTime: 30_000,
+  });
+}
+
+export function useApproveUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: { role: Role; designation: Designation };
+    }) => userService.approve(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all() });
+    },
   });
 }
