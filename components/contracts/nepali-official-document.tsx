@@ -261,7 +261,7 @@ export function NepaliOfficialDocument({
                     data-meta-size={metaCardSize}
                     className={`official-document-meta-card border border-stone-300/80 bg-white/80 shadow-sm backdrop-blur-[1px] ${
                       isSmallMetaCard
-                        ? "rounded-[8px] px-2 py-1 text-[10px] leading-4"
+                        ? "rounded-[6px] px-1.5 py-0.5 text-[9px] leading-3"
                         : isCompact
                           ? "rounded-[14px] px-3 py-2 text-[12px] leading-5"
                           : "rounded-xl px-3.5 py-2.5 text-[13px] leading-6"
@@ -280,7 +280,7 @@ export function NepaliOfficialDocument({
                             <p
                               className={`font-semibold text-stone-500 ${
                                 isSmallMetaCard
-                                  ? "text-[7px] tracking-[0.06em]"
+                                  ? "text-[6px]"
                                   : isCompact
                                     ? "text-[9px] tracking-[0.12em]"
                                     : "text-[11px] uppercase tracking-[0.18em]"
@@ -309,7 +309,7 @@ export function NepaliOfficialDocument({
                                 <span
                                   className={`text-stone-500 ${
                                     isSmallMetaCard
-                                      ? "min-w-[42px] text-[8px]"
+                                      ? "min-w-[36px] text-[7px]"
                                       : isCompact
                                         ? "min-w-[58px] text-[10px]"
                                         : "min-w-[72px]"
@@ -799,7 +799,7 @@ export function NepaliOfficialDocument({
         }
 
         .official-document-meta[data-meta-placement="left"] .official-document-meta-card[data-meta-size="small"] {
-          max-width: 46mm;
+          max-width: 38mm;
         }
 
         .official-document-root[data-letterhead="true"] {
@@ -942,7 +942,7 @@ export function NepaliOfficialDocument({
           }
 
           .official-document-meta[data-meta-placement="left"] .official-document-meta-card[data-meta-size="small"] {
-            max-width: 42mm !important;
+            max-width: 34mm !important;
           }
 
           .official-document-root[data-print-layout="screen"]

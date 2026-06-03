@@ -592,30 +592,10 @@ function CommitteeAgreementBody({
 
       <style jsx global>{`
         @media print {
-          .official-document-sheet:has(.committee-agreement-print) {
-            height: auto !important;
-            min-height: auto !important;
-            overflow: visible !important;
-          }
-
-          .official-document-sheet:has(.committee-agreement-print)
-            .official-document-content {
-            display: block !important;
-            height: auto !important;
-            min-height: auto !important;
-            padding: 10mm 12mm 12mm !important;
-            overflow: visible !important;
-          }
-
-          .official-document-sheet:has(.committee-agreement-print)
-            .official-document-content
-            > div {
-            width: 100% !important;
-          }
-
           .committee-agreement-print {
             break-inside: auto !important;
             page-break-inside: auto !important;
+            overflow: visible !important;
           }
 
           .committee-agreement-print section {
@@ -885,7 +865,8 @@ function AgreementContent() {
           />
         ) : undefined
       }
-      printLayout="screen"
+      printBottomReserveMm={6}
+      printTopShiftMm={34}
       signatures={agreementSignatures}
       subject=""
       subjectPrefix=""
