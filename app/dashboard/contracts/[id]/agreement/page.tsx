@@ -475,14 +475,7 @@ function CommitteeAgreementBody({
   ];
 
   return (
-    <div className="committee-agreement-print mt-7 space-y-5 text-[13px] leading-7 text-stone-900">
-      <div className="text-center leading-7">
-        <p className="font-semibold">अनुसूची २</p>
-        <p>(कार्यविधिको दफा ७(२) सँग सम्बन्धित)</p>
-        <p className="font-semibold">लहान नगरपालिका</p>
-        <p className="text-[17px] font-bold">योजना सम्झौता फाराम</p>
-      </div>
-
+    <div className="committee-agreement-print mt-4 space-y-5 text-[13px] leading-7 text-stone-900">
       <CommitteeSection title="१. सम्झौता गर्ने पक्ष र आयोजनाः">
         <p className="font-semibold">क) उपभोक्ता समितिको विवरणः</p>
         <FormLine label="१. नामः" value={committee?.name} />
@@ -750,9 +743,9 @@ function AgreementContent() {
         backHref={`/dashboard/contracts/${contract.id}`}
         body={[]}
         density="compact"
-        documentLabel="अनुसूची २"
         footerNote="यो योजना सम्झौता फाराम प्रणालीमा अभिलेखित उपभोक्ता समिति, आयोजना, सम्झौता रकम, मिति र पदाधिकारी विवरणका आधारमा तयार गरिएको हो ।"
         letterhead={false}
+        metaCardPlacement="left"
         meta={[
           {
             label: "सम्झौता नं.",
@@ -782,11 +775,19 @@ function AgreementContent() {
         }
         printBottomReserveMm={14}
         printTopShiftMm={0}
+        preMetaContent={
+          <div className="committee-agreement-heading text-center leading-7">
+            <p className="font-semibold">अनुसूची २</p>
+            <p>(कार्यविधिको दफा ७(२) सँग सम्वन्धित)</p>
+            <p className="font-semibold">लहान नगरपालिका</p>
+            <p className="text-[17px] font-bold">योजना सम्झौता फाराम</p>
+          </div>
+        }
         signatures={[]}
         subject=""
         subjectPrefix=""
-        subtitle="लहान नगरपालिका"
-        title="योजना सम्झौता फाराम"
+        subtitle=""
+        title=""
       />
     );
   }
@@ -861,10 +862,13 @@ function AgreementContent() {
       autoPrint={autoPrint}
       backHref={`/dashboard/contracts/${contract.id}`}
       body={body}
+      contentWidth={isCompanyAgreement ? "narrow" : "full"}
       density="compact"
       letterhead={false}
       documentLabel={isCompanyAgreement ? "कम्पनी/ठेकेदार ढाँचा" : "उपभोक्ता समिति ढाँचा"}
       footerNote="यो सम्झौता पत्र प्रणालीमा अभिलेखित सम्झौता, परियोजना, रकम र हस्ताक्षर विवरणका आधारमा तयार गरिएको हो ।"
+      metaCardPlacement="left"
+      metaCardSize="small"
       meta={meta}
       noteContent={customNote}
       noteTitle="रेकर्ड गरिएको थप सर्त"
@@ -881,6 +885,7 @@ function AgreementContent() {
           />
         ) : undefined
       }
+      printLayout="screen"
       signatures={agreementSignatures}
       subject=""
       subjectPrefix=""

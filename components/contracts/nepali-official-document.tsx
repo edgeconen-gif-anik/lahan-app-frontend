@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { ArrowLeft, Printer } from "lucide-react";
 import { Noto_Sans_Devanagari } from "next/font/google";
 import QRCode from "react-qr-code";
@@ -37,11 +37,17 @@ type NepaliOfficialDocumentProps = {
   headingLayout?: "centered" | "subject-line";
   letterhead?: boolean;
   meta: DocumentMeta[];
+  metaCardPlacement?: "right" | "left";
+  metaCardSize?: "default" | "small";
   noteContent?: string | null;
   noteTitle?: string;
   postBodyContent?: ReactNode;
+  printTitle?: string;
+  printLayout?: "default" | "screen";
+  preMetaContent?: ReactNode;
   printBottomReserveMm?: number;
   printTopShiftMm?: number;
+  screenTopShiftMm?: number;
   qrCodeLabel?: string;
   qrCodePlacement?: "meta" | "bottom-right" | "floating-bottom-right" | "below-corner";
   qrCodePath?: string;
@@ -77,11 +83,17 @@ export function NepaliOfficialDocument({
   headingLayout = "centered",
   letterhead = false,
   meta,
+  metaCardPlacement = "right",
+  metaCardSize = "default",
   noteContent,
   noteTitle = "रेकर्ड गरिएको थप विवरण",
   postBodyContent,
+  printTitle,
+  printLayout = "default",
+  preMetaContent,
   printBottomReserveMm,
   printTopShiftMm,
+  screenTopShiftMm,
   qrCodeLabel = "QR",
   qrCodePlacement = "meta",
   qrCodePath,
@@ -112,6 +124,8 @@ export function NepaliOfficialDocument({
   const showFloatingQr = Boolean(hasQrValue && qrCodePlacement === "floating-bottom-right");
   const showInlineBottomQr = showBottomQr && isBottomRightSignature;
   const shouldRenderMetaCard = Boolean(documentLabel || meta.length > 0 || showMetaQr);
+  const isLeftMetaCard = metaCardPlacement === "left";
+  const isSmallMetaCard = metaCardSize === "small";
   const windowOrigin = useSyncExternalStore(
     () => () => {},
     () => window.location.origin,
@@ -127,9 +141,12 @@ export function NepaliOfficialDocument({
           ? `${windowOrigin}${qrCodePath.startsWith("/") ? qrCodePath : `/${qrCodePath}`}`
           : "";
   const rootStyle =
-    printTopShiftMm == null && printBottomReserveMm == null
+    screenTopShiftMm == null && printTopShiftMm == null && printBottomReserveMm == null
       ? undefined
       : ({
+          ...(screenTopShiftMm == null
+            ? {}
+            : { "--document-screen-top-shift": `${screenTopShiftMm}mm` }),
           ...(printTopShiftMm == null
             ? {}
             : { "--document-print-top-shift": `${printTopShiftMm}mm` }),
@@ -138,20 +155,31 @@ export function NepaliOfficialDocument({
             : { "--document-print-bottom-reserve": `${printBottomReserveMm}mm` }),
         } as CSSProperties);
 
+  const printDocument = useCallback(() => {
+    const resolvedPrintTitle = printTitle?.trim();
+
+    if (resolvedPrintTitle) {
+      document.title = resolvedPrintTitle;
+    }
+
+    window.print();
+  }, [printTitle]);
+
   useEffect(() => {
     if (!autoPrint || hasAutoPrinted.current) return;
 
     hasAutoPrinted.current = true;
-    const timeout = window.setTimeout(() => window.print(), 300);
+    const timeout = window.setTimeout(printDocument, 300);
 
     return () => window.clearTimeout(timeout);
-  }, [autoPrint]);
+  }, [autoPrint, printDocument]);
 
   return (
     <div
       className="official-document-root min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.12),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#eef4ff_100%)] px-4 py-5 sm:px-6 sm:py-8 print:bg-white print:px-0 print:py-0"
       data-density={density}
       data-letterhead={letterhead ? "true" : "false"}
+      data-print-layout={printLayout}
       style={rootStyle}
     >
       {letterhead ? (
@@ -171,7 +199,7 @@ export function NepaliOfficialDocument({
           </Link>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={printDocument}
             className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
           >
             <Printer className="h-4 w-4" />
@@ -186,6 +214,10 @@ export function NepaliOfficialDocument({
             } ${devanagariFont.className}`}
           >
             <div className={isNarrowContent ? "mx-auto w-full max-w-[166mm]" : "w-full"}>
+              {preMetaContent ? (
+                <div className="official-document-pre-meta">{preMetaContent}</div>
+              ) : null}
+
               {cornerMeta ? (
                 <div className={`official-document-corner-meta flex justify-end ${isCompact ? "mb-2" : "mb-3"}`}>
                   <p className={isCompact ? "text-[13px] leading-6 text-stone-700" : "text-sm leading-7 text-stone-700"}>
@@ -219,10 +251,113 @@ export function NepaliOfficialDocument({
               ) : null}
 
               <div
+                data-meta-placement={metaCardPlacement}
                 className={`official-document-meta flex flex-col md:flex-row md:items-start md:justify-between ${
                   isCompact ? "gap-4" : "gap-5"
                 }`}
               >
+                {shouldRenderMetaCard && isLeftMetaCard ? (
+                  <div
+                    data-meta-size={metaCardSize}
+                    className={`official-document-meta-card border border-stone-300/80 bg-white/80 shadow-sm backdrop-blur-[1px] ${
+                      isSmallMetaCard
+                        ? "rounded-[8px] px-2 py-1 text-[10px] leading-4"
+                        : isCompact
+                          ? "rounded-[14px] px-3 py-2 text-[12px] leading-5"
+                          : "rounded-xl px-3.5 py-2.5 text-[13px] leading-6"
+                    }`}
+                  >
+                    <div
+                      className={
+                        isCompact && showMetaQr && hasMetaText
+                          ? "flex items-start gap-3"
+                          : "flex items-center justify-center"
+                      }
+                    >
+                      {hasMetaText ? (
+                        <div className="min-w-0 flex-1">
+                          {documentLabel ? (
+                            <p
+                              className={`font-semibold text-stone-500 ${
+                                isSmallMetaCard
+                                  ? "text-[7px] tracking-[0.06em]"
+                                  : isCompact
+                                    ? "text-[9px] tracking-[0.12em]"
+                                    : "text-[11px] uppercase tracking-[0.18em]"
+                              }`}
+                            >
+                              {documentLabel}
+                            </p>
+                          ) : null}
+                          <div
+                            className={
+                              documentLabel
+                                ? isSmallMetaCard
+                                  ? "mt-0.5 space-y-0.5"
+                                  : isCompact
+                                  ? "mt-1 space-y-0.5"
+                                  : "mt-1.5 space-y-1"
+                                : isSmallMetaCard
+                                  ? "space-y-0"
+                                  : isCompact
+                                  ? "space-y-0.5"
+                                  : "space-y-1"
+                            }
+                          >
+                            {meta.map((item) => (
+                              <div key={item.label} className="flex gap-2">
+                                <span
+                                  className={`text-stone-500 ${
+                                    isSmallMetaCard
+                                      ? "min-w-[42px] text-[8px]"
+                                      : isCompact
+                                        ? "min-w-[58px] text-[10px]"
+                                        : "min-w-[72px]"
+                                  }`}
+                                >
+                                  {item.label}
+                                </span>
+                                <span className="min-w-0 font-semibold text-stone-800">{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {showMetaQr ? (
+                        <div className={isCompact ? "shrink-0" : "mt-3"}>
+                          <div className="official-document-qr flex w-fit flex-col items-center rounded-[12px] border border-stone-200 bg-white shadow-sm">
+                            {resolvedQrCodeValue ? (
+                              <QRCode
+                                value={resolvedQrCodeValue}
+                                size={hasMetaText ? (isCompact ? 48 : 60) : isCompact ? 54 : 66}
+                                level="M"
+                                bgColor="#ffffff"
+                                fgColor="#111827"
+                              />
+                            ) : (
+                              <div
+                                className={
+                                  hasMetaText
+                                    ? isCompact
+                                      ? "h-[48px] w-[48px]"
+                                      : "h-[60px] w-[60px]"
+                                    : isCompact
+                                      ? "h-[54px] w-[54px]"
+                                      : "h-[66px] w-[66px]"
+                                }
+                              />
+                            )}
+                            <p className={isCompact ? "mt-0.5 text-[8px] font-medium text-stone-500" : "mt-1 text-[9px] font-medium text-stone-500"}>
+                              {qrCodeLabel}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div
                   className={
                     shouldRenderMetaCard
@@ -241,7 +376,7 @@ export function NepaliOfficialDocument({
                   ))}
                 </div>
 
-                {shouldRenderMetaCard ? (
+                {shouldRenderMetaCard && !isLeftMetaCard ? (
                   <div
                     className={`official-document-meta-card border border-stone-300/80 bg-white/80 shadow-sm backdrop-blur-[1px] ${
                       isCompact
@@ -646,12 +781,25 @@ export function NepaliOfficialDocument({
           --document-page-top: 25mm;
           --document-page-side: 14mm;
           --document-page-bottom: 25mm;
+          --document-screen-top-shift: 0mm;
           --document-print-top-shift: 4mm;
           --document-print-bottom-reserve: var(--document-page-bottom);
         }
 
         .official-document-content {
-          padding: var(--document-page-top) var(--document-page-side) var(--document-page-bottom);
+          padding: calc(var(--document-page-top) - var(--document-screen-top-shift)) var(--document-page-side) var(--document-page-bottom);
+        }
+
+        .official-document-meta[data-meta-placement="left"] {
+          justify-content: flex-start;
+        }
+
+        .official-document-meta[data-meta-placement="left"] .official-document-meta-card {
+          max-width: 72mm;
+        }
+
+        .official-document-meta[data-meta-placement="left"] .official-document-meta-card[data-meta-size="small"] {
+          max-width: 46mm;
         }
 
         .official-document-root[data-letterhead="true"] {
@@ -770,6 +918,37 @@ export function NepaliOfficialDocument({
           .official-document-content {
             min-height: 297mm !important;
             padding: calc(var(--document-page-top) - var(--document-print-top-shift)) var(--document-page-side) var(--document-print-bottom-reserve) !important;
+          }
+
+          .official-document-root[data-print-layout="screen"] .official-document-content {
+            padding: calc(var(--document-page-top) - var(--document-screen-top-shift)) var(--document-page-side) var(--document-page-bottom) !important;
+          }
+
+          .official-document-pre-meta {
+            break-after: avoid;
+            page-break-after: avoid;
+          }
+
+          .official-document-meta[data-meta-placement="left"] {
+            display: flex !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            gap: 4mm !important;
+          }
+
+          .official-document-meta[data-meta-placement="left"] .official-document-meta-card {
+            max-width: 68mm !important;
+            width: auto !important;
+          }
+
+          .official-document-meta[data-meta-placement="left"] .official-document-meta-card[data-meta-size="small"] {
+            max-width: 42mm !important;
+          }
+
+          .official-document-root[data-print-layout="screen"]
+            .official-document-meta[data-meta-placement="left"]
+            .official-document-meta-card[data-meta-size="small"] {
+            max-width: 46mm !important;
           }
 
           .official-document-corner-meta {

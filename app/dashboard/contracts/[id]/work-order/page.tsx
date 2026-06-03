@@ -154,12 +154,14 @@ function WorkOrderContent() {
       headingLayout="subject-line"
       letterhead
       meta={[]}
+      printTitle={`work_order_${contract.id}`}
       printBottomReserveMm={45}
-      printTopShiftMm={28}
+      printTopShiftMm={30}
       qrCodeLabel=""
       qrCodePlacement="below-corner"
       qrCodePath={`/dashboard/contracts/${contract.id}/work-order`}
       recipientLines={recipientLines}
+      screenTopShiftMm={2}
       signatureLayout="bottom-right"
       signatureNamePlacement="below"
       signatures={[
