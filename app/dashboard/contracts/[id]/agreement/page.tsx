@@ -847,7 +847,7 @@ function AgreementContent() {
       letterhead={false}
       documentLabel={isCompanyAgreement ? "कम्पनी/ठेकेदार ढाँचा" : "उपभोक्ता समिति ढाँचा"}
       footerNote="यो सम्झौता पत्र प्रणालीमा अभिलेखित सम्झौता, परियोजना, रकम र हस्ताक्षर विवरणका आधारमा तयार गरिएको हो ।"
-      metaCardPlacement="left"
+      metaCardPlacement={isCompanyAgreement ? "float-left" : "left"}
       metaCardSize="small"
       meta={meta}
       noteContent={customNote}
@@ -865,8 +865,8 @@ function AgreementContent() {
           />
         ) : undefined
       }
-      printBottomReserveMm={6}
-      printTopShiftMm={34}
+      printBottomReserveMm={4}
+      printTopShiftMm={38}
       signatures={agreementSignatures}
       subject=""
       subjectPrefix=""

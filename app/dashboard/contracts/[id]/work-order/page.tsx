@@ -155,8 +155,8 @@ function WorkOrderContent() {
       letterhead
       meta={[]}
       printTitle={`work_order_${contract.id}`}
-      printBottomReserveMm={45}
-      printTopShiftMm={30}
+      printBottomReserveMm={34}
+      printTopShiftMm={18}
       qrCodeLabel=""
       qrCodePlacement="below-corner"
       qrCodePath={`/dashboard/contracts/${contract.id}/work-order`}

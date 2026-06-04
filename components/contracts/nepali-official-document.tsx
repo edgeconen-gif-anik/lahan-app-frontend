@@ -37,7 +37,7 @@ type NepaliOfficialDocumentProps = {
   headingLayout?: "centered" | "subject-line";
   letterhead?: boolean;
   meta: DocumentMeta[];
-  metaCardPlacement?: "right" | "left";
+  metaCardPlacement?: "right" | "left" | "float-left";
   metaCardSize?: "default" | "small";
   noteContent?: string | null;
   noteTitle?: string;
@@ -125,6 +125,7 @@ export function NepaliOfficialDocument({
   const showInlineBottomQr = showBottomQr && isBottomRightSignature;
   const shouldRenderMetaCard = Boolean(documentLabel || meta.length > 0 || showMetaQr);
   const isLeftMetaCard = metaCardPlacement === "left";
+  const isFloatingMetaCard = metaCardPlacement === "float-left";
   const isSmallMetaCard = metaCardSize === "small";
   const windowOrigin = useSyncExternalStore(
     () => () => {},
@@ -173,6 +174,108 @@ export function NepaliOfficialDocument({
 
     return () => window.clearTimeout(timeout);
   }, [autoPrint, printDocument]);
+
+  const leftMetaCard = shouldRenderMetaCard ? (
+    <div
+      data-meta-size={metaCardSize}
+      className={`official-document-meta-card border border-stone-300/80 bg-white/80 shadow-sm backdrop-blur-[1px] ${
+        isSmallMetaCard
+          ? "rounded-[6px] px-1.5 py-0.5 text-[9px] leading-3"
+          : isCompact
+            ? "rounded-[14px] px-3 py-2 text-[12px] leading-5"
+            : "rounded-xl px-3.5 py-2.5 text-[13px] leading-6"
+      }`}
+    >
+      <div
+        className={
+          isCompact && showMetaQr && hasMetaText
+            ? "flex items-start gap-3"
+            : "flex items-center justify-center"
+        }
+      >
+        {hasMetaText ? (
+          <div className="min-w-0 flex-1">
+            {documentLabel ? (
+              <p
+                className={`font-semibold text-stone-500 ${
+                  isSmallMetaCard
+                    ? "text-[6px]"
+                    : isCompact
+                      ? "text-[9px] tracking-[0.12em]"
+                      : "text-[11px] uppercase tracking-[0.18em]"
+                }`}
+              >
+                {documentLabel}
+              </p>
+            ) : null}
+            <div
+              className={
+                documentLabel
+                  ? isSmallMetaCard
+                    ? "mt-0.5 space-y-0.5"
+                    : isCompact
+                      ? "mt-1 space-y-0.5"
+                      : "mt-1.5 space-y-1"
+                  : isSmallMetaCard
+                    ? "space-y-0"
+                    : isCompact
+                      ? "space-y-0.5"
+                      : "space-y-1"
+              }
+            >
+              {meta.map((item) => (
+                <div key={item.label} className="flex gap-2">
+                  <span
+                    className={`text-stone-500 ${
+                      isSmallMetaCard
+                        ? "min-w-[36px] text-[7px]"
+                        : isCompact
+                          ? "min-w-[58px] text-[10px]"
+                          : "min-w-[72px]"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                  <span className="min-w-0 font-semibold text-stone-800">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {showMetaQr ? (
+          <div className={isCompact ? "shrink-0" : "mt-3"}>
+            <div className="official-document-qr flex w-fit flex-col items-center rounded-[12px] border border-stone-200 bg-white shadow-sm">
+              {resolvedQrCodeValue ? (
+                <QRCode
+                  value={resolvedQrCodeValue}
+                  size={hasMetaText ? (isCompact ? 48 : 60) : isCompact ? 54 : 66}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#111827"
+                />
+              ) : (
+                <div
+                  className={
+                    hasMetaText
+                      ? isCompact
+                        ? "h-[48px] w-[48px]"
+                        : "h-[60px] w-[60px]"
+                      : isCompact
+                        ? "h-[54px] w-[54px]"
+                        : "h-[66px] w-[66px]"
+                  }
+                />
+              )}
+              <p className={isCompact ? "mt-0.5 text-[8px] font-medium text-stone-500" : "mt-1 text-[9px] font-medium text-stone-500"}>
+                {qrCodeLabel}
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div
@@ -256,111 +359,11 @@ export function NepaliOfficialDocument({
                   isCompact ? "gap-4" : "gap-5"
                 }`}
               >
-                {shouldRenderMetaCard && isLeftMetaCard ? (
-                  <div
-                    data-meta-size={metaCardSize}
-                    className={`official-document-meta-card border border-stone-300/80 bg-white/80 shadow-sm backdrop-blur-[1px] ${
-                      isSmallMetaCard
-                        ? "rounded-[6px] px-1.5 py-0.5 text-[9px] leading-3"
-                        : isCompact
-                          ? "rounded-[14px] px-3 py-2 text-[12px] leading-5"
-                          : "rounded-xl px-3.5 py-2.5 text-[13px] leading-6"
-                    }`}
-                  >
-                    <div
-                      className={
-                        isCompact && showMetaQr && hasMetaText
-                          ? "flex items-start gap-3"
-                          : "flex items-center justify-center"
-                      }
-                    >
-                      {hasMetaText ? (
-                        <div className="min-w-0 flex-1">
-                          {documentLabel ? (
-                            <p
-                              className={`font-semibold text-stone-500 ${
-                                isSmallMetaCard
-                                  ? "text-[6px]"
-                                  : isCompact
-                                    ? "text-[9px] tracking-[0.12em]"
-                                    : "text-[11px] uppercase tracking-[0.18em]"
-                              }`}
-                            >
-                              {documentLabel}
-                            </p>
-                          ) : null}
-                          <div
-                            className={
-                              documentLabel
-                                ? isSmallMetaCard
-                                  ? "mt-0.5 space-y-0.5"
-                                  : isCompact
-                                  ? "mt-1 space-y-0.5"
-                                  : "mt-1.5 space-y-1"
-                                : isSmallMetaCard
-                                  ? "space-y-0"
-                                  : isCompact
-                                  ? "space-y-0.5"
-                                  : "space-y-1"
-                            }
-                          >
-                            {meta.map((item) => (
-                              <div key={item.label} className="flex gap-2">
-                                <span
-                                  className={`text-stone-500 ${
-                                    isSmallMetaCard
-                                      ? "min-w-[36px] text-[7px]"
-                                      : isCompact
-                                        ? "min-w-[58px] text-[10px]"
-                                        : "min-w-[72px]"
-                                  }`}
-                                >
-                                  {item.label}
-                                </span>
-                                <span className="min-w-0 font-semibold text-stone-800">{item.value}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {showMetaQr ? (
-                        <div className={isCompact ? "shrink-0" : "mt-3"}>
-                          <div className="official-document-qr flex w-fit flex-col items-center rounded-[12px] border border-stone-200 bg-white shadow-sm">
-                            {resolvedQrCodeValue ? (
-                              <QRCode
-                                value={resolvedQrCodeValue}
-                                size={hasMetaText ? (isCompact ? 48 : 60) : isCompact ? 54 : 66}
-                                level="M"
-                                bgColor="#ffffff"
-                                fgColor="#111827"
-                              />
-                            ) : (
-                              <div
-                                className={
-                                  hasMetaText
-                                    ? isCompact
-                                      ? "h-[48px] w-[48px]"
-                                      : "h-[60px] w-[60px]"
-                                    : isCompact
-                                      ? "h-[54px] w-[54px]"
-                                      : "h-[66px] w-[66px]"
-                                }
-                              />
-                            )}
-                            <p className={isCompact ? "mt-0.5 text-[8px] font-medium text-stone-500" : "mt-1 text-[9px] font-medium text-stone-500"}>
-                              {qrCodeLabel}
-                            </p>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
+                {isLeftMetaCard ? leftMetaCard : null}
 
                 <div
                   className={
-                    shouldRenderMetaCard
+                    shouldRenderMetaCard && !isFloatingMetaCard
                       ? isCompact
                         ? "space-y-0.5 md:max-w-[56%]"
                         : "max-w-[70%] space-y-1"
@@ -376,7 +379,7 @@ export function NepaliOfficialDocument({
                   ))}
                 </div>
 
-                {shouldRenderMetaCard && !isLeftMetaCard ? (
+                {shouldRenderMetaCard && !isLeftMetaCard && !isFloatingMetaCard ? (
                   <div
                     className={`official-document-meta-card border border-stone-300/80 bg-white/80 shadow-sm backdrop-blur-[1px] ${
                       isCompact
@@ -523,6 +526,12 @@ export function NepaliOfficialDocument({
                   isCompact ? "mt-6 space-y-4 text-[14px] leading-8" : "mt-8 space-y-5 text-[15px] leading-9"
                 }`}
               >
+                {isFloatingMetaCard && leftMetaCard ? (
+                  <div className="official-document-floating-meta float-left -mt-[24mm] mb-2 mr-3">
+                    {leftMetaCard}
+                  </div>
+                ) : null}
+
                 {body.map((paragraph, index) => (
                   <p
                     key={`${documentLabel ?? title}-${index}`}
