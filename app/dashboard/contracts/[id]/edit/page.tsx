@@ -6,6 +6,19 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save, AlertCircle, Loader2 } from "lucide-react";
 import { useContract, useUpdateContract } from "@/hooks/contract/useContracts";
 
+type MutationError = {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  const message = (error as MutationError)?.response?.data?.message;
+  return Array.isArray(message) ? message.join(", ") : (message ?? fallback);
+}
+
 // ── Matches UpdateContractSchema in contract.dto.ts ──────────────────────────
 interface EditFormState {
   contractNumber:         string;
@@ -31,10 +44,21 @@ function toDateInput(value: string | null | undefined): string {
 }
 
 // ── Build PATCH payload — strips empty strings to undefined ──────────────────
+function toAmountInput(value: number | string | null | undefined): number | "" {
+  if (value == null || value === "") return "";
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : "";
+}
+
 function buildPayload(form: EditFormState) {
+  const contractAmount =
+    form.contractAmount !== "" && Number.isFinite(Number(form.contractAmount))
+      ? Number(form.contractAmount)
+      : undefined;
+
   return {
     contractNumber:         form.contractNumber         || undefined,
-    contractAmount:         form.contractAmount !== ""  ? Number(form.contractAmount) : undefined,
+    contractAmount,
     startDate:              form.startDate              || undefined,
     intendedCompletionDate: form.intendedCompletionDate || undefined,
     actualCompletionDate:   form.actualCompletionDate   || undefined,
@@ -75,9 +99,10 @@ export default function EditContractPage() {
   useEffect(() => {
     if (!contract) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData({
       contractNumber:         contract.contractNumber         ?? "",
-      contractAmount:         Number(contract.contractAmount) ?? "",
+      contractAmount:         toAmountInput(contract.contractAmount),
       // ✅ toDateInput guards against null/undefined/invalid — no more RangeError
       startDate:              toDateInput(contract.startDate),
       intendedCompletionDate: toDateInput(contract.intendedCompletionDate),
@@ -107,14 +132,17 @@ export default function EditContractPage() {
     e.preventDefault();
     setSubmitError(null);
 
+    if (!contract) {
+      setSubmitError("Failed to load contract for editing.");
+      return;
+    }
+
     try {
       await updateContract({ id: contractId, data: buildPayload(formData) });
       router.push(`/dashboard/contracts/${contractId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to update contract:", error);
-      setSubmitError(
-        error?.response?.data?.message ?? "Failed to update contract. Please try again.",
-      );
+      setSubmitError(getErrorMessage(error, "Failed to update contract. Please try again."));
     }
   };
 
@@ -203,6 +231,7 @@ export default function EditContractPage() {
                 name="contractAmount"
                 required
                 min="1"
+                step="0.01"
                 value={formData.contractAmount}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border rounded-md bg-background font-mono"
