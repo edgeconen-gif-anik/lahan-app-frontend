@@ -8,7 +8,7 @@ import {
   Building2, Users, User, Hash, AlertTriangle,
   CheckCircle2, Clock, BadgeCheck, Loader2,
   ChevronDown, Pencil, Ban, Printer,
-  CalendarDays, TrendingUp, Archive,
+  CalendarDays, TrendingUp, Archive, ReceiptText,
 } from "lucide-react";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import { useApproveContract, useContract, useUpdateContract } from "@/hooks/contract/useContracts";
@@ -728,7 +728,7 @@ function DocumentActionCard({
   onPrint,
   title,
 }: {
-  accent: "blue" | "violet";
+  accent: "blue" | "violet" | "emerald";
   available: boolean;
   detail: string;
   icon: React.ReactNode;
@@ -737,9 +737,11 @@ function DocumentActionCard({
   onPrint?: () => void;
   title: string;
 }) {
-  const accentCls = accent === "blue"
-    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900"
-    : "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900";
+  const accentCls = {
+    blue: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
+    violet: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900",
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
+  }[accent];
 
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
@@ -919,6 +921,15 @@ export default function ContractDetailPage() {
             >
               {isCompleted ? <Pencil size={13} /> : <CheckSquare size={13} />}
               {isCompleted ? "Edit Final Amount" : "Contract Update"}
+            </button>
+          )}
+          {isCompleted && contract.completionCode && (
+            <button
+              onClick={() => router.push(`/dashboard/contracts/${id}/payment-form`)}
+              className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <ReceiptText size={13} />
+              Payment Form
             </button>
           )}
           <StatusUpdater
@@ -1135,7 +1146,7 @@ export default function ContractDetailPage() {
       )}
 
       <Section title="Documents" icon={<CheckSquare size={16} />}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <DocumentActionCard
             accent="blue"
             available
@@ -1156,6 +1167,17 @@ export default function ContractDetailPage() {
             onOpen={() => router.push(`/dashboard/contracts/${id}/work-order`)}
             onPrint={() => openDocumentPrint(`/dashboard/contracts/${id}/work-order`)}
             title="Work Order Document"
+          />
+
+          <DocumentActionCard
+            accent="emerald"
+            available={isCompleted && Boolean(contract.completionCode)}
+            detail="Ma. Le. Pa. Form 202 payment recommendation page is available after project completion."
+            icon={<ReceiptText size={18} />}
+            meta={`Contract: ${contract.contractNumber} | Completion: ${contract.completionCode ?? "Not generated"}`}
+            onOpen={() => router.push(`/dashboard/contracts/${id}/payment-form`)}
+            onPrint={() => openDocumentPrint(`/dashboard/contracts/${id}/payment-form`)}
+            title="Payment Recommendation"
           />
         </div>
       </Section>

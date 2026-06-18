@@ -16,6 +16,7 @@ import {
   Plus,
   Search,
   Trash2,
+  User,
   Users,
 } from "lucide-react";
 import { CONTRACT_KEYS, useApproveContract, useContracts, useUpdateContractStatus } from "@/hooks/contract/useContracts";
@@ -241,6 +242,7 @@ function ContractRow({
           sublabel: "User Committee",
         }
       : null;
+  const siteIncharge = contract.siteIncharge ?? contract.project?.siteIncharge ?? null;
 
   return (
     <tr className="border-b align-top">
@@ -271,6 +273,18 @@ function ContractRow({
           <div className="font-medium">{contract.project?.name ?? "Unlinked Project"}</div>
           {contract.project?.sNo && (
             <div className="text-xs text-muted-foreground">S.No: {contract.project.sNo}</div>
+          )}
+          {siteIncharge && (
+            <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <User className="h-3 w-3" />
+              <span>
+                Site Incharge:{" "}
+                <span className="font-medium text-foreground">{siteIncharge.name}</span>
+                {siteIncharge.designation ? (
+                  <span className="text-muted-foreground"> ({siteIncharge.designation})</span>
+                ) : null}
+              </span>
+            </div>
           )}
         </div>
       </td>
