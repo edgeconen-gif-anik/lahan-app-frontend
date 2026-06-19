@@ -128,7 +128,7 @@ function PaymentFormContent() {
         </button>
       </div>
 
-      <article className="mx-auto min-h-[297mm] w-full max-w-[210mm] bg-white px-[14mm] py-[12mm] shadow-xl print:min-h-0 print:max-w-none print:px-[12mm] print:py-[8mm] print:shadow-none">
+      <article className="payment-form-sheet mx-auto min-h-[297mm] w-full max-w-[210mm] bg-white px-[14mm] py-[12mm] shadow-xl print:min-h-0 print:max-w-none print:px-[12mm] print:py-[8mm] print:shadow-none">
         <header className="text-center leading-tight">
           <h1 className="text-[18px] font-semibold">लहान नगरपालिका</h1>
           <p className="text-[16px] font-medium">नगर कार्यपालिकको कार्यालय</p>
@@ -361,6 +361,15 @@ function PaymentFormContent() {
         .border-box {
           border: 1px solid #111827;
           padding: 5px;
+        }
+
+        .payment-form-sheet {
+          background-image: url("/payment_bg_rec.png");
+          background-position: center;
+          background-repeat: no-repeat;
+          background-size: 100% 100%;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
 
         @page {
