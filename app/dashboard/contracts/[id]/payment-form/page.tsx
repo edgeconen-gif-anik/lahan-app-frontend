@@ -105,6 +105,7 @@ function PaymentFormContent() {
   }
 
   const finalEvaluatedAmount = formatAmount(contract.finalEvaluatedAmount);
+  const projectName = contract.project?.name ?? "";
 
   return (
     <div
@@ -190,10 +191,7 @@ function PaymentFormContent() {
             </tr>
             <tr className="tall-row">
               <td />
-              <td>
-                अधुरो डिहिबार मन्दिर निर्माण कार्य, लहान-२३, (करैया टोल
-                पोखरीको डिलमा)
-              </td>
+              <td>{projectName}</td>
               <td>3.1&nbsp; Measurement Book</td>
               <td>{finalEvaluatedAmount}</td>
               <td />
