@@ -46,8 +46,8 @@ export default function ProjectLandingPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState<SortColumn>("createdAt");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<SortColumn>("sNo");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
 
@@ -199,10 +199,10 @@ export default function ProjectLandingPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-card border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Loaded Projects</p>
-          <p className="text-2xl font-bold mt-1">{displayedProjects.length}</p>
+          <p className="text-sm text-muted-foreground">Projects</p>
+          <p className="text-2xl font-bold mt-1">{data?.meta?.total ?? 0}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Total available: {data?.meta?.total || 0}
+            Showing {displayedProjects.length} on this page
           </p>
         </div>
         <div className="bg-card border rounded-lg p-4">

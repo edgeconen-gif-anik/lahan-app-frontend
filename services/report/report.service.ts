@@ -77,8 +77,8 @@ export const reportService = {
         contractService.getAll(scopedParams),
         fetchAllProjects({
           ...(scopedParams ?? {}),
-          sortBy: "createdAt",
-          sortOrder: "desc",
+          sortBy: "sNo",
+          sortOrder: "asc",
         }),
       ]);
 
