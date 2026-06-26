@@ -13,6 +13,10 @@ type MutationError = {
   };
 };
 
+type ProjectQueryOptions = ProjectQueryParams & {
+  enabled?: boolean;
+};
+
 function getErrorMessage(error: unknown, fallback: string) {
   const message = (error as MutationError)?.response?.data?.message;
   return Array.isArray(message) ? message.join(", ") : (message ?? fallback);
@@ -23,7 +27,7 @@ const PROJECT_KEYS = {
   all: ["projects"] as const,
   lists: () => [...PROJECT_KEYS.all, "list"] as const,
   // Automatically caches based on the new `search` param when passed in
-  list: (params: ProjectQueryParams) => [...PROJECT_KEYS.lists(), params] as const,
+  list: (params: ProjectQueryOptions) => [...PROJECT_KEYS.lists(), params] as const,
   details: () => [...PROJECT_KEYS.all, "detail"] as const,
   detail: (id: string) => [...PROJECT_KEYS.details(), id] as const,
 };
@@ -31,11 +35,14 @@ const PROJECT_KEYS = {
 // ================================
 // 1. Fetch Projects (List)
 // ================================
-export const useProjects = (params: ProjectQueryParams = {}) => {
+export const useProjects = (params: ProjectQueryOptions = {}) => {
+  const { enabled = true, ...queryParams } = params;
+
   return useQuery({
     queryKey: PROJECT_KEYS.list(params),
-    queryFn: () => projectService.getAll(params),
+    queryFn: () => projectService.getAll(queryParams),
     placeholderData: keepPreviousData, 
+    enabled,
   });
 };
 
