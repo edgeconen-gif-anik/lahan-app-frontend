@@ -127,6 +127,24 @@ export const ProfileSummarySchema = z.object({
   totalProjectContractValue:        z.number(),
 });
 
+export const FuelUsageMonthSchema = z.object({
+  key:          z.string(),
+  month:        z.string(),
+  monthIndex:   z.number(),
+  petrolLiters: z.coerce.number(),
+  dieselLiters: z.coerce.number(),
+  totalLiters:  z.coerce.number(),
+  totalAmount:  z.coerce.number(),
+  logCount:     z.number(),
+});
+
+export const FuelUsageSummarySchema = z.object({
+  fiscalYear:  z.string(),
+  totalLiters: z.coerce.number(),
+  totalAmount: z.coerce.number(),
+  months:      z.array(FuelUsageMonthSchema),
+});
+
 // ─── User list item (from GET /users) ────────────────────────────────────────
 
 export const UserListItemSchema = z.object({
@@ -154,6 +172,7 @@ export const UserProfileSchema = z.object({
   image:       z.string().nullable().optional(),
   createdAt:   z.string(),
   summary:     ProfileSummarySchema,
+  fuelUsage:   FuelUsageSummarySchema.optional(),
   siteInchargeProjects: z.array(ProfileProjectSchema),
   managedContracts:     z.array(ManagedContractSchema),
 });
@@ -206,4 +225,5 @@ export type UserDashboard    = z.infer<typeof UserDashboardSchema>;
 export type ProfileProject   = z.infer<typeof ProfileProjectSchema>;
 export type ManagedContract  = z.infer<typeof ManagedContractSchema>;
 export type ProfileSummary   = z.infer<typeof ProfileSummarySchema>;
+export type FuelUsageSummary = z.infer<typeof FuelUsageSummarySchema>;
 export type UserListResponse = z.infer<typeof UserListResponseSchema>;

@@ -20,6 +20,7 @@ import {
   Building2,
   Users,
   Calendar,
+  Fuel,
 } from "lucide-react";
 import {
   Designation,
@@ -46,6 +47,12 @@ function formatCurrency(n: number) {
   if (n >= 10_000_000) return `रू ${(n / 10_000_000).toFixed(2)} Cr`;
   if (n >= 100_000)    return `रू ${(n / 100_000).toFixed(2)} L`;
   return `रू ${n.toLocaleString("ne-NP")}`;
+}
+
+function formatLiters(n: number) {
+  return `${n.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })} L`;
 }
 
 function toDateDisplay(iso: string | null | undefined) {
@@ -149,12 +156,10 @@ function ContractRow({ contract }: {
 function ProjectGroup({
   projectName,
   projectSNo,
-  projectStatus,
   contracts,
 }: {
   projectName:   string;
   projectSNo?:   string | null;
-  projectStatus: string;
   contracts: Array<{
     id: string;
     contractNumber: string;
@@ -286,7 +291,9 @@ export default function UserProfilePage() {
     );
   }
 
-  const { summary, siteInchargeProjects, managedContracts } = profile;
+  const { siteInchargeProjects, managedContracts, fuelUsage } = profile;
+  const fuelLogCount =
+    fuelUsage?.months.reduce((sum, month) => sum + month.logCount, 0) ?? 0;
 
   // ── Merge both sources into one unified project map ───────────────────────
   //
@@ -458,6 +465,72 @@ export default function UserProfilePage() {
         />
       </div>
 
+      {fuelUsage && (
+        <div className="bg-card border rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-lg bg-orange-100 text-orange-700">
+                <Fuel size={17} />
+              </span>
+              <div>
+                <h2 className="text-base font-semibold">Fuel Usage</h2>
+                <p className="text-xs text-muted-foreground">
+                  Fiscal Year {fuelUsage.fiscalYear}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 text-sm">
+              <span className="rounded-md border px-3 py-1.5 font-medium">
+                {formatLiters(fuelUsage.totalLiters)}
+              </span>
+              <span className="rounded-md border px-3 py-1.5 font-medium">
+                {formatCurrency(fuelUsage.totalAmount)}
+              </span>
+              <span className="rounded-md border px-3 py-1.5 text-muted-foreground">
+                {fuelLogCount} log{fuelLogCount === 1 ? "" : "s"}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">Month</th>
+                  <th className="px-4 py-3 text-right font-medium">Petrol</th>
+                  <th className="px-4 py-3 text-right font-medium">Diesel</th>
+                  <th className="px-4 py-3 text-right font-medium">Total</th>
+                  <th className="px-4 py-3 text-right font-medium">Amount</th>
+                  <th className="px-4 py-3 text-right font-medium">Logs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fuelUsage.months.map((month) => (
+                  <tr key={month.key} className="border-t">
+                    <td className="px-4 py-3 font-medium">{month.month}</td>
+                    <td className="px-4 py-3 text-right">
+                      {formatLiters(month.petrolLiters)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {formatLiters(month.dieselLiters)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold">
+                      {formatLiters(month.totalLiters)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {formatCurrency(month.totalAmount)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">
+                      {month.logCount}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── Ongoing Projects ── */}
       {ongoingProjects.length > 0 && (
         <div className="space-y-3">
@@ -473,7 +546,6 @@ export default function UserProfilePage() {
                 key={p.id}
                 projectName={p.name}
                 projectSNo={p.sNo}
-                projectStatus={p.status}
                 contracts={p.contracts}
               />
             ))}
@@ -497,7 +569,6 @@ export default function UserProfilePage() {
                 key={p.id}
                 projectName={p.name}
                 projectSNo={p.sNo}
-                projectStatus={p.status}
                 contracts={p.contracts}
               />
             ))}

@@ -67,6 +67,11 @@ function shortDate(value?: string | null) {
   return date === "N/A" || date === "Invalid Date" ? "" : date;
 }
 
+function toNepaliNumber(value: number | string) {
+  const digits = ["०", "१", "२", "३", "४", "५", "६", "७", "८", "९"];
+  return String(value).replace(/\d/g, (digit) => digits[Number(digit)] ?? digit);
+}
+
 function CheckboxLine({ label }: { label: string }) {
   return (
     <div className="check-line">
@@ -126,7 +131,8 @@ function SignBlock({
   );
 }
 
-function DemandFormDocument({ fuelLog }: { fuelLog: FuelLog }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function LegacyDemandFormDocument({ fuelLog }: { fuelLog: FuelLog }) {
   return (
     <article className="fuel-sheet excel-demand-sheet">
       <section className="excel-header">
@@ -244,6 +250,162 @@ function DemandFormDocument({ fuelLog }: { fuelLog: FuelLog }) {
           <p>मितिः</p>
         </div>
       </section>
+    </article>
+  );
+}
+
+function fieldLine(value?: string | number | null) {
+  return valueText(value, "................................");
+}
+
+function DemandFormDocument({ fuelLog }: { fuelLog: FuelLog }) {
+  const requester = userName(fuelLog.requestedBy) || userName(fuelLog.user);
+  const recommender =
+    userName(fuelLog.approvedBy) ||
+    (fuelLog.approvalStatus === "APPROVED" ? userName(fuelLog.requestedBy) : "");
+  const recommenderDesignation =
+    fuelLog.approvedBy?.designation ??
+    (fuelLog.approvalStatus === "APPROVED"
+      ? fuelLog.requestedBy?.designation
+      : undefined);
+  const fiscalYear =
+    fuelLog.project?.fiscalYear ?? fuelLog.contract?.fiscalYear ?? "................";
+  const itemSpecification = [
+    fuelLog.vehicleNumber ? `सवारी नं. ${fuelLog.vehicleNumber}` : "इन्धन",
+    fuelLog.odometerReading ? `ओडोमिटर ${fuelLog.odometerReading} कि.मि.` : null,
+    fuelLog.project?.name ? `योजना: ${fuelLog.project.name}` : null,
+    fuelLog.contract?.contractNumber
+      ? `सम्झौता नं. ${fuelLog.contract.contractNumber}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+
+  return (
+    <article className="fuel-sheet demand-document-sheet">
+      <header className="demand-document-header">
+        <div className="form-code">म.ले.प. फाराम नं : ४०१</div>
+        <h1>लहान नगरपालिका</h1>
+        <h2>नगर कार्यपालिकाको कार्यालय</h2>
+        <h3>लहान, सिराहा</h3>
+        <p>कार्यालय कोड नं.: ....................</p>
+        <h4>माग फाराम</h4>
+      </header>
+
+      <section className="demand-meta-table" aria-label="Demand form metadata">
+        <div />
+        <div>आर्थिक वर्ष : {fiscalYear}</div>
+        <div />
+        <div>माग फाराम नं : FL-{serial(fuelLog.id)}</div>
+        <div />
+        <div>मिति : {shortDate(fuelLog.logDate)}</div>
+      </section>
+
+      <table className="official-demand-table">
+        <colgroup>
+          <col className="d-col-sn" />
+          <col className="d-col-name" />
+          <col className="d-col-spec" />
+          <col className="d-col-unit" />
+          <col className="d-col-qty" />
+          <col className="d-col-remarks" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th rowSpan={2}>क्र.सं.</th>
+            <th rowSpan={2}>सामानको नाम</th>
+            <th rowSpan={2}>स्पेसिफिकेशन</th>
+            <th colSpan={2}>माग गरिएको</th>
+            <th rowSpan={2}>कैफियत</th>
+          </tr>
+          <tr>
+            <th>एकाइ</th>
+            <th>परिमाण</th>
+          </tr>
+          <tr className="table-index-row">
+            <td>१</td>
+            <td>२</td>
+            <td>३</td>
+            <td>४</td>
+            <td>५</td>
+            <td>६</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>१</td>
+            <td>{NEPALI_FUEL_TYPE_LABEL[fuelLog.fuelType]}</td>
+            <td>{itemSpecification}</td>
+            <td>लिटर</td>
+            <td>{fuelLog.quantityLiters}</td>
+            <td>{fuelLog.remarks || ""}</td>
+          </tr>
+          {Array.from({ length: 5 }).map((_, index) => (
+            <tr key={index} className="official-empty-row">
+              <td>{toNepaliNumber(index + 2)}</td>
+              <td />
+              <td />
+              <td />
+              <td />
+              <td />
+            </tr>
+          ))}
+          <tr className="purpose-table-row">
+            <td />
+            <td>प्रयोजन:</td>
+            <td>{fuelLog.purpose}</td>
+            <td />
+            <td />
+            <td />
+          </tr>
+        </tbody>
+      </table>
+
+      <table className="demand-sign-table">
+        <tbody>
+          <tr>
+            <td>
+              <strong>माग गर्ने:</strong>
+              <p>नाम: {fieldLine(requester)}</p>
+              <p>पद: {fieldLine(fuelLog.requestedBy?.designation ?? fuelLog.user?.designation)}</p>
+              <p>मिति: {shortDate(fuelLog.createdAt)}</p>
+            </td>
+            <td>
+              <strong>सिफारिस गर्ने:</strong>
+              <p>नाम: {fieldLine(recommender)}</p>
+              <p>पद: {fieldLine(recommenderDesignation)}</p>
+              <p>मिति: {fuelLog.approvedAt ? shortDate(fuelLog.approvedAt) : "................................"}</p>
+            </td>
+            <td>
+              <strong className="center-label">स्टोरकिपरले भर्ने</strong>
+              <p>क) बजारबाट खरिद गर्नु पर्ने <span className="inline-box" /></p>
+              <p>ख) गोदाममा रहेको <span className="inline-box" /></p>
+              <p>स्टोरकिपरको दस्तखत: ....................</p>
+              <p>नाम: ................................</p>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>स्वीकृत गर्ने:</strong>
+              <p>नाम: {fieldLine(userName(fuelLog.approvedBy))}</p>
+              <p>पद: {fieldLine(fuelLog.approvedBy?.designation)}</p>
+              <p>मिति: {fuelLog.approvedAt ? shortDate(fuelLog.approvedAt) : "................................"}</p>
+            </td>
+            <td>
+              <strong>मालसामान बुझिलिने:</strong>
+              <p>नाम: ................................</p>
+              <p>पद: ................................</p>
+              <p>मिति: ................................</p>
+            </td>
+            <td>
+              <strong>खर्च निकासा खातामा चढाउने:</strong>
+              <p>नाम: ................................</p>
+              <p>पद: ................................</p>
+              <p>मिति: ................................</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </article>
   );
 }
@@ -477,7 +639,7 @@ function FuelPrintContent({ mode }: { mode: FuelDocumentMode }) {
         ))}
       </main>
 
-      <style jsx>{`
+      <style jsx global>{`
         .doc-tab {
           border: 1px solid #cbd5e1;
           border-radius: 8px;
@@ -570,6 +732,202 @@ function FuelPrintContent({ mode }: { mode: FuelDocumentMode }) {
 
         .excel-demand-sheet {
           padding: 7mm 8mm 0 14mm;
+        }
+
+        .demand-document-sheet {
+          border: 1px solid #111827;
+          font-family: Arial, "Noto Sans Devanagari", sans-serif;
+          padding: 9mm 10mm;
+        }
+
+        .demand-document-header {
+          position: relative;
+          text-align: center;
+        }
+
+        .demand-document-header .form-code {
+          font-size: 10px;
+          font-weight: 800;
+          position: absolute;
+          right: 0;
+          top: 0;
+        }
+
+        .demand-document-header h1 {
+          font-size: 16px;
+          font-weight: 900;
+          line-height: 1.35;
+          margin: 0 auto;
+          text-align: center;
+        }
+
+        .demand-document-header h2,
+        .demand-document-header h3 {
+          font-size: 13px;
+          font-weight: 900;
+          line-height: 1.35;
+          margin: 0 auto;
+          text-align: center;
+        }
+
+        .demand-document-header p {
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1.5;
+          margin: 1mm auto 0;
+          text-align: center;
+        }
+
+        .demand-document-header h4 {
+          border-top: 1px solid #111827;
+          display: inline-block;
+          font-size: 14px;
+          font-weight: 900;
+          line-height: 1.4;
+          margin: 5mm auto 0;
+          min-width: 42mm;
+          padding-top: 2mm;
+          text-align: center;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+
+        .demand-meta-table {
+          display: grid;
+          grid-template-columns: 1fr 64mm;
+          margin: 3mm 0 2mm;
+        }
+
+        .demand-meta-table div {
+          align-items: center;
+          border: 1px solid transparent;
+          display: flex;
+          font-size: 11px;
+          font-weight: 800;
+          min-height: 6mm;
+          padding: 0 2mm;
+        }
+
+        .official-demand-table,
+        .demand-sign-table {
+          border-collapse: collapse;
+          table-layout: fixed;
+          width: 100%;
+        }
+
+        .official-demand-table .d-col-sn {
+          width: 9%;
+        }
+
+        .official-demand-table .d-col-name {
+          width: 25%;
+        }
+
+        .official-demand-table .d-col-spec {
+          width: 31%;
+        }
+
+        .official-demand-table .d-col-unit {
+          width: 11%;
+        }
+
+        .official-demand-table .d-col-qty {
+          width: 10%;
+        }
+
+        .official-demand-table .d-col-remarks {
+          width: 14%;
+        }
+
+        .official-demand-table th,
+        .official-demand-table td,
+        .demand-sign-table td {
+          border: 1px solid #111827;
+          font-size: 11px;
+          line-height: 1.35;
+          padding: 1.8mm 2mm;
+          vertical-align: top;
+        }
+
+        .official-demand-table th {
+          font-weight: 900;
+          text-align: center;
+          vertical-align: middle;
+        }
+
+        .official-demand-table td:first-child,
+        .official-demand-table td:nth-child(4),
+        .official-demand-table td:nth-child(5),
+        .table-index-row td {
+          text-align: center;
+          vertical-align: middle;
+        }
+
+        .table-index-row td {
+          font-size: 10px;
+          font-weight: 800;
+          height: 6mm;
+          padding: 1mm;
+        }
+
+        .official-demand-table tbody td {
+          height: 10mm;
+        }
+
+        .official-demand-table .official-empty-row td {
+          height: 8mm;
+        }
+
+        .official-demand-table .purpose-table-row td {
+          font-size: 11px;
+          font-weight: 700;
+          height: 10mm;
+          vertical-align: middle;
+        }
+
+        .official-demand-table .purpose-table-row td:nth-child(2) {
+          font-weight: 900;
+          text-align: right;
+        }
+
+        .official-demand-table .purpose-table-row td:nth-child(3) {
+          text-align: left;
+        }
+
+        .demand-sign-table {
+          margin-top: 7mm;
+        }
+
+        .demand-sign-table td {
+          height: 37mm;
+          width: 33.333%;
+        }
+
+        .demand-sign-table strong {
+          display: block;
+          font-size: 11px;
+          font-weight: 900;
+          margin-bottom: 2mm;
+        }
+
+        .demand-sign-table p {
+          font-size: 10.5px;
+          line-height: 1.7;
+          margin: 0;
+          min-height: 5.5mm;
+        }
+
+        .center-label {
+          text-align: center;
+        }
+
+        .inline-box {
+          border: 1px solid #111827;
+          display: inline-block;
+          height: 4mm;
+          margin-left: 3mm;
+          vertical-align: middle;
+          width: 4mm;
         }
 
         .excel-header {
