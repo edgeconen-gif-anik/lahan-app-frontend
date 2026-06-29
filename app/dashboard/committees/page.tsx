@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
-  useUserCommittees,
+  useAllUserCommittees,
   useApproveUserCommittee,
 } from "@/hooks/user-committee/useUserCommittees";
 import type {
@@ -38,17 +38,13 @@ export default function CommitteeLandingPage() {
   const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
-  const effectiveFiscalYear = fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
-  const { data: committeesData, isLoading } = useUserCommittees({
+  const effectiveFiscalYear = fiscalYearFilter ?? "";
+  const { data: committeesList = [], isLoading } = useAllUserCommittees({
     search,
     fiscalYear: effectiveFiscalYear || undefined,
   });
   const { mutate: approveCommittee, isPending: isApprovingCommittee } =
     useApproveUserCommittee();
-
-  const committeesList = Array.isArray(committeesData)
-    ? committeesData
-    : committeesData?.data || [];
 
   return (
     <div className="space-y-6 p-6 max-w-full mx-auto overflow-x-auto">

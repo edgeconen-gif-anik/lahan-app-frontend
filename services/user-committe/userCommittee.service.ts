@@ -42,14 +42,88 @@ export type UserCommitteeMutationPayload = Record<string, unknown> & {
   id?: string;
 };
 
+function normalizeUserCommitteeListResponse(
+  payload: unknown,
+  params?: UserCommitteeListParams
+): UserCommitteeListResponse {
+  if (Array.isArray(payload)) {
+    return {
+      data: payload as UserCommitteeRecord[],
+      meta: {
+        total: payload.length,
+        page: params?.page ?? 1,
+        lastPage: 1,
+      },
+    };
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    const response = payload as Partial<UserCommitteeListResponse> & {
+      data: UserCommitteeRecord[];
+    };
+
+    return {
+      data: response.data,
+      meta: {
+        total: response.meta?.total ?? response.data.length,
+        page: response.meta?.page ?? params?.page ?? 1,
+        lastPage: response.meta?.lastPage ?? 1,
+      },
+    };
+  }
+
+  return {
+    data: [],
+    meta: {
+      total: 0,
+      page: params?.page ?? 1,
+      lastPage: 1,
+    },
+  };
+}
+
+function uniqueCommitteesById(committees: UserCommitteeRecord[]) {
+  return Array.from(
+    new Map(committees.map((committee) => [committee.id, committee])).values()
+  );
+}
+
 export const userCommitteeService = {
   getAll: async (
     params?: UserCommitteeListParams
   ): Promise<UserCommitteeListResponse> => {
-    const { data } = await api.get<UserCommitteeListResponse>("/user-committees", {
+    const { data } = await api.get<unknown>("/user-committees", {
       params,
     });
-    return data;
+    return normalizeUserCommitteeListResponse(data, params);
+  },
+
+  getAllRegistered: async (
+    params?: Omit<UserCommitteeListParams, "page">
+  ): Promise<UserCommitteeRecord[]> => {
+    const limit = params?.limit ?? 100;
+    const firstPage = await userCommitteeService.getAll({
+      ...params,
+      page: 1,
+      limit,
+    });
+    const committees = [...firstPage.data];
+
+    for (let page = 2; page <= firstPage.meta.lastPage; page += 1) {
+      const response = await userCommitteeService.getAll({
+        ...params,
+        page,
+        limit,
+      });
+      committees.push(...response.data);
+    }
+
+    return uniqueCommitteesById(committees);
   },
 
   getOne: async (id: string): Promise<UserCommitteeRecord> => {

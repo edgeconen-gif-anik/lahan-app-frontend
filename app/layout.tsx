@@ -8,6 +8,11 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Lahan PMS",
   description: "Project Management System",
+  icons: {
+    icon: "/lahan_pms_fevicon.png",
+    shortcut: "/lahan_pms_fevicon.png",
+    apple: "/lahan_pms_fevicon.png",
+  },
 };
 
 export default function RootLayout({

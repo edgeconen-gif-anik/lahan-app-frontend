@@ -37,6 +37,15 @@ export const useUserCommittees = (params?: UserCommitteeListParams) => {
   });
 };
 
+export const useAllUserCommittees = (
+  params?: Omit<UserCommitteeListParams, "page">
+) => {
+  return useQuery({
+    queryKey: ["userCommittees", "all", params],
+    queryFn: () => userCommitteeService.getAllRegistered(params),
+  });
+};
+
 export const useUserCommittee = (id: string) => {
   return useQuery({
     queryKey: ["userCommittees", id],
