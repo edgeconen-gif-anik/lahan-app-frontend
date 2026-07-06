@@ -19,7 +19,12 @@ function normalizeCompanyListResponse(payload: unknown): Company[] {
 }
 
 export const companyService = {
-  getAll: async (params?: { search?: string; limit?: number; page?: number }): Promise<Company[]> => {
+  getAll: async (params?: {
+    search?: string;
+    limit?: number;
+    page?: number;
+    approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+  }): Promise<Company[]> => {
     const { data } = await api.get("/companies", { params });
     return normalizeCompanyListResponse(data);
   },

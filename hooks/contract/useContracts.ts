@@ -23,6 +23,7 @@ type ContractListParams = {
   userId?: string;
   siteInchargeId?: string;
   fiscalYear?: string;
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
 };
 
 type MutationError = {

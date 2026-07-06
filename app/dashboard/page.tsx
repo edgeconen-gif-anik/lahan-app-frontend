@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -15,6 +17,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +30,19 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUserDashboard } from "@/hooks/project/use-dashboard";
+import { useUsers } from "@/hooks/user/useUsers";
+import { companyService } from "@/services/company/company.service";
+import { contractService } from "@/services/contract/contractService";
+import { fuelService } from "@/services/fuel/fuelService";
+import { userCommitteeService } from "@/services/user-committe/userCommittee.service";
+
+type PendingTask = {
+  id: string;
+  type: string;
+  title: string;
+  meta: string;
+  href: string;
+};
 
 function formatMoney(value?: number) {
   return `Rs. ${(value ?? 0).toLocaleString("en-IN")}`;
@@ -58,10 +74,118 @@ function getStatusClasses(status?: string) {
 export default function DashboardLandingPage() {
   const { data: session } = useSession();
   const { data: dashboardData, isLoading } = useUserDashboard();
+  const [showPendingTasks, setShowPendingTasks] = useState(false);
 
   const user = session?.user;
+  const isAdmin = user?.role === "ADMIN";
   const stats = dashboardData?.stats;
   const completionRate = stats?.completionRate ?? 0;
+
+  const { data: pendingUsers, isLoading: isLoadingUsers } = useUsers(
+    { approvalStatus: "PENDING", limit: 100 },
+    { enabled: isAdmin }
+  );
+
+  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery({
+    queryKey: ["dashboard", "pending-approvals", "companies"],
+    queryFn: () =>
+      companyService.getAll({ approvalStatus: "PENDING", limit: 100 }),
+    enabled: isAdmin,
+  });
+
+  const { data: committees = [], isLoading: isLoadingCommittees } = useQuery({
+    queryKey: ["dashboard", "pending-approvals", "committees"],
+    queryFn: () =>
+      userCommitteeService.getAllRegistered({
+        approvalStatus: "PENDING",
+        limit: 100,
+      }),
+    enabled: isAdmin,
+  });
+
+  const { data: contracts = [], isLoading: isLoadingContracts } = useQuery({
+    queryKey: ["dashboard", "pending-approvals", "contracts"],
+    queryFn: () => contractService.getAll({ approvalStatus: "PENDING" }),
+    enabled: isAdmin,
+  });
+
+  const { data: fuelLogs, isLoading: isLoadingFuelLogs } = useQuery({
+    queryKey: ["dashboard", "pending-approvals", "fuel-logs"],
+    queryFn: () =>
+      fuelService.getAll({
+        approvalStatus: "PENDING",
+        limit: 100,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      }),
+    enabled: isAdmin,
+  });
+
+  const pendingTasks = useMemo<PendingTask[]>(() => {
+    if (!isAdmin) return [];
+
+    const userTasks =
+      pendingUsers?.data.map((pendingUser) => ({
+        id: `user-${pendingUser.id}`,
+        type: "User approval",
+        title: pendingUser.name || pendingUser.email || "Unnamed user",
+        meta: pendingUser.email || "Awaiting role and designation approval",
+        href: "/dashboard/users",
+      })) ?? [];
+
+    const companyTasks = companies.map((company) => ({
+      id: `company-${company.id}`,
+      type: "Company approval",
+      title: company.name,
+      meta: company.address,
+      href: `/dashboard/companies/${company.id}`,
+    }));
+
+    const committeeTasks = committees.map((committee) => ({
+      id: `committee-${committee.id}`,
+      type: "Committee approval",
+      title: committee.name,
+      meta: [committee.fiscalYear, committee.address].filter(Boolean).join(" · "),
+      href: `/dashboard/committees/${committee.id}`,
+    }));
+
+    const contractTasks = contracts.map((contract) => ({
+      id: `contract-${contract.id}`,
+      type: "Contract approval",
+      title: contract.contractNumber,
+      meta:
+        contract.project?.name ||
+        contract.company?.name ||
+        contract.userCommittee?.name ||
+        "Contract awaiting approval",
+      href: `/dashboard/contracts/${contract.id}`,
+    }));
+
+    const fuelTasks =
+      fuelLogs?.data.map((fuelLog) => ({
+        id: `fuel-${fuelLog.id}`,
+        type: "Fuel approval",
+        title: fuelLog.project?.name || fuelLog.contract?.contractNumber || fuelLog.purpose,
+        meta: `${fuelLog.fuelType} · ${fuelLog.quantityLiters} L`,
+        href: "/dashboard/fuel",
+      })) ?? [];
+
+    return [
+      ...committeeTasks,
+      ...companyTasks,
+      ...contractTasks,
+      ...fuelTasks,
+      ...userTasks,
+    ];
+  }, [companies, committees, contracts, fuelLogs, isAdmin, pendingUsers]);
+
+  const isLoadingPendingTasks =
+    isAdmin &&
+    (isLoadingCompanies ||
+      isLoadingCommittees ||
+      isLoadingContracts ||
+      isLoadingFuelLogs ||
+      isLoadingUsers);
 
   if (isLoading) {
     return (
@@ -148,6 +272,69 @@ export default function DashboardLandingPage() {
           </Button>
         </div>
       </div>
+
+      {isAdmin && (
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Clock3 className="h-4 w-4 text-amber-700" />
+                Pending Tasks
+              </CardTitle>
+              <CardDescription>
+                Approval items waiting for admin action.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant={showPendingTasks ? "secondary" : "outline"}
+              onClick={() => setShowPendingTasks((current) => !current)}
+            >
+              {isLoadingPendingTasks ? "Loading..." : pendingTasks.length}
+              pending
+              <ArrowUpRight className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          {showPendingTasks && (
+            <CardContent>
+              {isLoadingPendingTasks ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                </div>
+              ) : pendingTasks.length ? (
+                <div className="divide-y rounded-md border">
+                  {pendingTasks.map((task) => (
+                    <Link
+                      key={task.id}
+                      href={task.href}
+                      className="flex flex-col gap-3 p-4 transition hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">{task.type}</Badge>
+                          <ApprovalStatusBadge status="PENDING" />
+                        </div>
+                        <p className="truncate font-medium leading-5">
+                          {task.title}
+                        </p>
+                        <p className="line-clamp-2 text-sm text-muted-foreground">
+                          {task.meta}
+                        </p>
+                      </div>
+                      <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+                  No pending approvals right now.
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((item) => (

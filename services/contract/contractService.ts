@@ -21,6 +21,7 @@ export const contractService = {
     userId?: string;
     siteInchargeId?: string;
     fiscalYear?: string;
+    approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
   }): Promise<Contract[]> => {
     const { data } = await api.get<Contract[]>("/contracts", { params });
     return data;

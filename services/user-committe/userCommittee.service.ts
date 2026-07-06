@@ -25,6 +25,7 @@ export type UserCommitteeRecord = {
 export type UserCommitteeListParams = {
   search?: string;
   fiscalYear?: string;
+  approvalStatus?: ApprovalStatus;
   page?: number;
   limit?: number;
 };
