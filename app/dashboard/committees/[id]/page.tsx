@@ -17,6 +17,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   Edit,
+  ExternalLink,
+  FileSignature,
   Loader2,
   User,
   Phone,
@@ -29,11 +31,26 @@ import {
 } from "lucide-react";
 
 import { toFormalNepaliDate } from "@/lib/date-utils";
+import { ContractStatusBadge } from "@/components/contract-status-badge";
+import { useContracts } from "@/hooks/contract/useContracts";
 import {
   useApproveUserCommittee,
   useUserCommittee,
   useDeleteUserCommittee,
 } from "@/hooks/user-committee/useUserCommittees";
+
+function formatCurrency(value?: number | string | null) {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount)) return "Rs. 0";
+
+  return `Rs. ${amount.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatDate(value?: string | null) {
+  return value ? toFormalNepaliDate(value) : "Not set";
+}
 
 export default function CommitteeDetailPage() {
   const params = useParams();
@@ -43,6 +60,9 @@ export default function CommitteeDetailPage() {
   const isAdmin = session?.user?.role === "ADMIN";
 
   const { data: committee, isLoading } = useUserCommittee(id);
+  const { data: contracts = [], isLoading: isLoadingContracts } = useContracts({
+    userCommitteeId: id,
+  });
   const { mutate: approveCommittee, isPending: isApproving } =
     useApproveUserCommittee();
   const { mutate: deleteCommittee, isPending: isDeleting } =
@@ -318,6 +338,101 @@ export default function CommitteeDetailPage() {
           </Card>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileSignature className="h-5 w-5" />
+                Contract Details
+              </CardTitle>
+              <CardDescription>
+                Contracts linked with this user committee.
+              </CardDescription>
+            </div>
+            <Badge variant={contracts.length ? "default" : "secondary"}>
+              {contracts.length ? "Contracted" : "Not contracted"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingContracts ? (
+            <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading contract details...
+            </div>
+          ) : contracts.length ? (
+            <div className="space-y-3">
+              {contracts.map((contract) => (
+                <div
+                  key={contract.id}
+                  className="rounded-lg border bg-card p-4 shadow-sm"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <Link
+                        href={`/dashboard/contracts/${contract.id}`}
+                        className="inline-flex items-center gap-2 font-semibold hover:underline"
+                      >
+                        {contract.contractNumber}
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                      <p className="text-sm text-muted-foreground">
+                        {contract.project?.name ?? "Project not linked"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ContractStatusBadge status={contract.status} compact />
+                      <ApprovalStatusBadge status={contract.approvalStatus} />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Amount
+                      </p>
+                      <p className="mt-1 font-semibold">
+                        {formatCurrency(contract.contractAmount)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Timeline
+                      </p>
+                      <p className="mt-1 text-muted-foreground">
+                        {formatDate(contract.startDate)} -{" "}
+                        {formatDate(
+                          contract.actualCompletionDate ??
+                            contract.intendedCompletionDate
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Fiscal Year
+                      </p>
+                      <p className="mt-1 text-muted-foreground">
+                        {contract.fiscalYear}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <FileSignature className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+              <p className="text-sm font-medium">No contract linked yet.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Contract details will appear here once this committee is selected
+                on a contract.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -26,7 +26,7 @@ import {
 import { useContracts, useCreateContract, useNextContractNumber } from "@/hooks/contract/useContracts";
 import { useProjects } from "@/hooks/project/useProjects";
 import { useCompanies } from "@/hooks/company/useCompany";
-import { useUserCommittees } from "@/hooks/user-committee/useUserCommittees";
+import { useAllUserCommittees } from "@/hooks/user-committee/useUserCommittees";
 import { useUsers } from "@/hooks/user/useUsers";
 import type { CreateContractPayload } from "@/lib/schema/contract/contract";
 import { toAdDate } from "@/lib/date-utils";
@@ -1201,9 +1201,7 @@ export default function NewContractPage() {
     isLoading: isLoadingUsers,
   } = useUsers({ search: debouncedUserSearch }, { enabled: isAdmin });
   const { data: companies, isLoading: isLoadingCompanies } = useCompanies();
-  const { data: userCommittees, isLoading: isLoadingUC } = useUserCommittees({
-    fiscalYear: currentFiscalYear,
-  });
+  const { data: userCommittees, isLoading: isLoadingUC } = useAllUserCommittees();
 
   const availableProjects = extractList<ContractProjectOption>(projects);
   const existingContractByProjectId = useMemo(
