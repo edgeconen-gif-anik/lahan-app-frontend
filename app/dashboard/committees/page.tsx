@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
@@ -15,9 +15,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
-import { CheckCircle2, Eye, Plus, Search, Users } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, Phone, Plus, Search, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { ApprovalStatus } from "@/lib/schema/approval";
+
+type ApprovalFilter = "ALL" | ApprovalStatus;
 
 const getOfficialDetails = (officials: CommitteeOfficial[], role: string) => {
   const official = officials?.find((o) => o.role === role);
@@ -36,6 +40,7 @@ export default function CommitteeLandingPage() {
   const isAdmin = session?.user?.role === "ADMIN";
   const [search, setSearch] = useState("");
   const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("ALL");
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
   const effectiveFiscalYear = fiscalYearFilter ?? "";
@@ -45,6 +50,34 @@ export default function CommitteeLandingPage() {
   });
   const { mutate: approveCommittee, isPending: isApprovingCommittee } =
     useApproveUserCommittee();
+  const statusCounts = useMemo(
+    () =>
+      committeesList.reduce(
+        (counts, committee) => {
+          counts.total += 1;
+          counts[committee.approvalStatus] += 1;
+          return counts;
+        },
+        { total: 0, PENDING: 0, APPROVED: 0, REJECTED: 0 }
+      ),
+    [committeesList]
+  );
+  const pendingCommittees = useMemo(
+    () =>
+      committeesList.filter(
+        (committee) => committee.approvalStatus === "PENDING"
+      ),
+    [committeesList]
+  );
+  const visibleCommittees = useMemo(
+    () =>
+      approvalFilter === "ALL"
+        ? committeesList
+        : committeesList.filter(
+            (committee) => committee.approvalStatus === approvalFilter
+          ),
+    [approvalFilter, committeesList]
+  );
 
   return (
     <div className="space-y-6 p-6 max-w-full mx-auto overflow-x-auto">
@@ -85,10 +118,118 @@ export default function CommitteeLandingPage() {
             </option>
           ))}
         </select>
+        <select
+          value={approvalFilter}
+          onChange={(event) =>
+            setApprovalFilter(event.target.value as ApprovalFilter)
+          }
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="ALL">All Approval Status</option>
+          <option value="PENDING">Pending Approval</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="py-4">
+          <CardContent className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Committees</p>
+              <p className="text-2xl font-semibold">{statusCounts.total}</p>
+            </div>
+            <Users className="h-5 w-5 text-muted-foreground" />
+          </CardContent>
+        </Card>
+        <Card className="py-4 border-amber-200 bg-amber-50/60">
+          <CardContent className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-amber-800">Pending Approval</p>
+              <p className="text-2xl font-semibold text-amber-900">
+                {statusCounts.PENDING}
+              </p>
+            </div>
+            <AlertCircle className="h-5 w-5 text-amber-700" />
+          </CardContent>
+        </Card>
+        <Card className="py-4">
+          <CardContent className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Approved</p>
+              <p className="text-2xl font-semibold">{statusCounts.APPROVED}</p>
+            </div>
+            <CheckCircle2 className="h-5 w-5 text-emerald-700" />
+          </CardContent>
+        </Card>
+        <Card className="py-4">
+          <CardContent className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Rejected</p>
+              <p className="text-2xl font-semibold">{statusCounts.REJECTED}</p>
+            </div>
+            <AlertCircle className="h-5 w-5 text-rose-700" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {isAdmin && pendingCommittees.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/80 py-4 shadow-sm">
+          <CardHeader className="gap-3 px-4 sm:flex sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-base text-amber-950">
+                <AlertCircle className="h-4 w-4" />
+                Pending approval requests
+              </CardTitle>
+              <p className="text-sm text-amber-800">
+                Review committee registrations waiting for admin approval.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setApprovalFilter("PENDING")}
+            >
+              Review pending
+            </Button>
+          </CardHeader>
+          <CardContent className="grid gap-3 px-4 md:grid-cols-3">
+            {pendingCommittees.slice(0, 3).map((committee) => (
+              <div
+                key={committee.id}
+                className="rounded-md border border-amber-200 bg-background/80 p-3"
+              >
+                <Link
+                  href={`/dashboard/committees/${committee.id}`}
+                  className="line-clamp-1 font-medium hover:underline"
+                >
+                  {committee.name}
+                </Link>
+                <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                  {committee.address}
+                </p>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <ApprovalStatusBadge status={committee.approvalStatus} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isApprovingCommittee}
+                    onClick={() => approveCommittee(committee.id)}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Approve
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="rounded-md border bg-card shadow-sm overflow-x-auto">
-        <Table className="min-w-[1100px]">
+        <Table className="min-w-[1180px]">
           <TableHeader>
             <TableRow>
               <TableHead className="text-center font-bold" rowSpan={2}>S.No</TableHead>
@@ -122,14 +263,14 @@ export default function CommitteeLandingPage() {
                   <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                 </TableRow>
               ))
-            ) : committeesList.length === 0 ? (
+            ) : visibleCommittees.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                   No committees found.
                 </TableCell>
               </TableRow>
             ) : (
-              committeesList.map((committee: UserCommitteeRecord, index: number) => (
+              visibleCommittees.map((committee: UserCommitteeRecord, index: number) => (
                 <TableRow key={committee.id}>
                   <TableCell className="text-center">{index + 1}</TableCell>
 
@@ -157,7 +298,7 @@ export default function CommitteeLandingPage() {
                   </TableCell>
 
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                       {isAdmin && committee.approvalStatus !== "APPROVED" && (
                         <Button
                           variant="outline"
@@ -171,6 +312,11 @@ export default function CommitteeLandingPage() {
                       <Link href={`/dashboard/committees/${committee.id}`}>
                         <Button variant="outline" size="sm">
                           <Eye className="h-4 w-4 mr-2" /> View
+                        </Button>
+                      </Link>
+                      <Link href={`/dashboard/committees/${committee.id}#official-contacts`}>
+                        <Button variant="outline" size="sm">
+                          <Phone className="h-4 w-4 mr-2" /> Contacts
                         </Button>
                       </Link>
                     </div>

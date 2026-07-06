@@ -104,10 +104,10 @@ export default function CommitteeDetailPage() {
   }
 
   return (
-    <div className="space-y-6 p-6 max-w-4xl mx-auto">
+    <div className="space-y-6 p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
           <Link href="/dashboard/committees">
             <Button variant="outline" size="icon">
               <ArrowLeft className="h-4 w-4" />
@@ -126,7 +126,13 @@ export default function CommitteeDetailPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href={`/dashboard/committees/${id}#official-contacts`}>
+            <Button variant="outline">
+              <Phone className="h-4 w-4 mr-2" /> Contacts
+            </Button>
+          </Link>
+
           {isAdmin && committee.approvalStatus !== "APPROVED" && (
             <Button
               variant="outline"
@@ -273,14 +279,22 @@ export default function CommitteeDetailPage() {
 
         {/* Right Column - Officials */}
         <div className="md:col-span-2">
-          <Card className="h-full">
+          <Card id="official-contacts" className="h-full scroll-mt-24">
             <CardHeader>
-              <CardTitle className="text-lg">
-                Committee Officials
-              </CardTitle>
-              <CardDescription>
-                Members and their designated roles.
-              </CardDescription>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="text-lg">
+                    Committee Officials and Contacts
+                  </CardTitle>
+                  <CardDescription>
+                    Associated contact records for committee members and their roles.
+                  </CardDescription>
+                </div>
+                <Badge variant="secondary">
+                  {committee.officials?.length ?? 0} contact
+                  {(committee.officials?.length ?? 0) === 1 ? "" : "s"}
+                </Badge>
+              </div>
             </CardHeader>
 
             <CardContent>
@@ -290,10 +304,10 @@ export default function CommitteeDetailPage() {
                     (official) => (
                       <div
                         key={official.id}
-                        className="flex flex-col p-4 border rounded-lg bg-card shadow-sm space-y-3"
+                        className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold">
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="min-w-0 font-semibold">
                             {official.name}
                           </span>
                           <Badge
@@ -310,9 +324,12 @@ export default function CommitteeDetailPage() {
 
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Phone className="h-4 w-4" />
-                          <span>
+                          <a
+                            href={`tel:${official.phoneNumber}`}
+                            className="font-medium text-foreground hover:text-primary hover:underline"
+                          >
                             {official.phoneNumber}
-                          </span>
+                          </a>
                         </div>
 
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -322,6 +339,18 @@ export default function CommitteeDetailPage() {
                               "Not Provided"}
                           </span>
                         </div>
+
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="mt-auto w-full"
+                        >
+                          <a href={`tel:${official.phoneNumber}`}>
+                            <Phone className="mr-2 h-4 w-4" />
+                            Call contact
+                          </a>
+                        </Button>
                       </div>
                     )
                   )}
