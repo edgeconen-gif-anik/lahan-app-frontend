@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   setupService,
+  SystemSetup,
   UpdateSystemSetupPayload,
 } from "@/services/setup/setupService";
+import { mergeFiscalYears } from "@/lib/fiscal-year";
 
 export const SETUP_KEYS = {
   all: ["setup"] as const,
@@ -42,9 +44,14 @@ export const useUpdateSystemSetup = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: UpdateSystemSetupPayload) => setupService.update(payload),
-    onSuccess: async () => {
+    mutationFn: (payload: UpdateSystemSetupPayload) =>
+      setupService.update(payload),
+    onSuccess: async (settings) => {
       toast.success("Setup saved");
+      queryClient.setQueryData<SystemSetup>(SETUP_KEYS.settings(), settings);
+      queryClient.setQueryData<string[]>(SETUP_KEYS.fiscalYears(), (years) =>
+        mergeFiscalYears(years, settings.currentFiscalYear),
+      );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: SETUP_KEYS.all }),
         queryClient.invalidateQueries({ queryKey: ["projects"] }),

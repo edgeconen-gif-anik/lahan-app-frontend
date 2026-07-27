@@ -62,7 +62,8 @@ export default function ProjectLandingPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const effectiveFiscalYear = fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
+  const effectiveFiscalYear =
+    fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
 
   const { data, isLoading } = useProjects({
     page,
@@ -108,7 +109,9 @@ export default function ProjectLandingPage() {
 
   const getSortIcon = (column: SortColumn) => {
     if (sortBy !== column) {
-      return <ArrowUpDown size={14} className="ml-1 text-muted-foreground/50" />;
+      return (
+        <ArrowUpDown size={14} className="ml-1 text-muted-foreground/50" />
+      );
     }
 
     return sortOrder === "asc" ? (
@@ -157,17 +160,17 @@ export default function ProjectLandingPage() {
     })
     .filter(
       (project: DisplayProject) =>
-        !statusFilter || project.displayStatus === statusFilter
+        !statusFilter || project.displayStatus === statusFilter,
     );
 
   const ongoingCount = displayedProjects.filter(
-    (project) => project.displayStatus === "ONGOING"
+    (project) => project.displayStatus === "ONGOING",
   ).length;
   const completedCount = displayedProjects.filter(
-    (project) => project.displayStatus === "COMPLETED"
+    (project) => project.displayStatus === "COMPLETED",
   ).length;
   const archivedCount = displayedProjects.filter(
-    (project) => project.displayStatus === "ARCHIVED"
+    (project) => project.displayStatus === "ARCHIVED",
   ).length;
 
   return (
@@ -207,7 +210,9 @@ export default function ProjectLandingPage() {
         </div>
         <div className="bg-card border rounded-lg p-4">
           <p className="text-sm text-muted-foreground">Ongoing</p>
-          <p className="text-2xl font-bold mt-1 text-blue-700">{ongoingCount}</p>
+          <p className="text-2xl font-bold mt-1 text-blue-700">
+            {ongoingCount}
+          </p>
           <p className="text-xs text-muted-foreground mt-1">
             Completed: {completedCount} · Archived: {archivedCount}
           </p>
@@ -248,6 +253,7 @@ export default function ProjectLandingPage() {
             setPage(1);
           }}
         >
+          <option value="all">All Fiscal Years</option>
           {fiscalYears.map((year) => (
             <option key={year} value={year}>
               {year}
@@ -363,7 +369,7 @@ export default function ProjectLandingPage() {
                     <td className="p-4">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-bold ${getStatusClasses(
-                          project.displayStatus
+                          project.displayStatus,
                         )}`}
                       >
                         {project.displayStatus.replace(/_/g, " ")}

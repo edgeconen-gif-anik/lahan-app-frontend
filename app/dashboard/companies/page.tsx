@@ -22,7 +22,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from "@/components/ui/table";
 
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 import {
@@ -40,7 +40,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
 
 import {
@@ -58,6 +58,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
+import { ALL_FISCAL_YEARS } from "@/lib/fiscal-year";
 
 import {
   AlertDialog,
@@ -67,7 +68,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 export default function CompanyListPage() {
@@ -85,7 +86,8 @@ export default function CompanyListPage() {
     fiscalYear: effectiveFiscalYear || undefined,
   });
   const { mutate: deleteCompany } = useDeleteCompany();
-  const { mutate: approveCompany, isPending: isApprovingCompany } = useApproveCompany();
+  const { mutate: approveCompany, isPending: isApprovingCompany } =
+    useApproveCompany();
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
@@ -111,23 +113,26 @@ export default function CompanyListPage() {
 
   const isLoading = isLoadingCompanies || isLoadingContracts;
   const isCompanyContracted = (company: (typeof companies)[number]) =>
-    getCompanyIsContracted(company, contractCountsByCompany.get(company.id) ?? 0);
+    getCompanyIsContracted(
+      company,
+      contractCountsByCompany.get(company.id) ?? 0,
+    );
 
   /* ------------------ Stats ------------------ */
 
   const totalCompanies = companies.length;
   const pendingCompanies = companies.filter(
-    (company) => company.approvalStatus === "PENDING"
+    (company) => company.approvalStatus === "PENDING",
   ).length;
 
   const contractedCompanies = companies.filter(
     (company) =>
-      isApprovedStatus(company.approvalStatus) && isCompanyContracted(company)
+      isApprovedStatus(company.approvalStatus) && isCompanyContracted(company),
   ).length;
 
   const nonContractedCompanies = companies.filter(
     (company) =>
-      isApprovedStatus(company.approvalStatus) && !isCompanyContracted(company)
+      isApprovedStatus(company.approvalStatus) && !isCompanyContracted(company),
   ).length;
 
   /* ------------------ Filter + Sort ------------------ */
@@ -140,15 +145,20 @@ export default function CompanyListPage() {
           String(company?.panNumber || "").includes(search);
 
         const matchesCategory =
-          categoryFilter === "ALL" ||
-          company.category === categoryFilter;
+          categoryFilter === "ALL" || company.category === categoryFilter;
 
         const matchesContract =
           contractFilter === "ALL" ||
           (contractFilter === "CONTRACTED" &&
-            getCompanyIsContracted(company, contractCountsByCompany.get(company.id) ?? 0)) ||
+            getCompanyIsContracted(
+              company,
+              contractCountsByCompany.get(company.id) ?? 0,
+            )) ||
           (contractFilter === "NON_CONTRACTED" &&
-            !getCompanyIsContracted(company, contractCountsByCompany.get(company.id) ?? 0));
+            !getCompanyIsContracted(
+              company,
+              contractCountsByCompany.get(company.id) ?? 0,
+            ));
 
         return matchesSearch && matchesCategory && matchesContract;
       })
@@ -169,7 +179,14 @@ export default function CompanyListPage() {
 
         return 0;
       });
-  }, [companies, search, categoryFilter, contractFilter, sortBy, contractCountsByCompany]);
+  }, [
+    companies,
+    search,
+    categoryFilter,
+    contractFilter,
+    sortBy,
+    contractCountsByCompany,
+  ]);
 
   const getAvailabilityBadgeLabel = (approvalStatus: string) => {
     if (approvalStatus === "PENDING") return "Awaiting approval";
@@ -179,7 +196,6 @@ export default function CompanyListPage() {
 
   return (
     <div className="space-y-6">
-
       {/* Header */}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -200,8 +216,9 @@ export default function CompanyListPage() {
 
       {/* Stats Cards */}
 
-      <div className={`grid gap-4 ${isAdmin ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
-
+      <div
+        className={`grid gap-4 ${isAdmin ? "md:grid-cols-4" : "md:grid-cols-3"}`}
+      >
         <div className="p-4 rounded-lg border bg-white dark:bg-gray-950 shadow-sm">
           <p className="text-sm text-muted-foreground">Total Companies</p>
           <p className="text-2xl font-bold">{totalCompanies}</p>
@@ -229,13 +246,11 @@ export default function CompanyListPage() {
             {nonContractedCompanies}
           </p>
         </div>
-
       </div>
 
       {/* Filters */}
 
       <div className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-gray-950 p-4 rounded-lg border shadow-sm">
-
         <div className="relative w-full md:w-96">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
 
@@ -247,14 +262,12 @@ export default function CompanyListPage() {
           />
         </div>
 
-        <Select
-          value={effectiveFiscalYear}
-          onValueChange={setFiscalYearFilter}
-        >
+        <Select value={effectiveFiscalYear} onValueChange={setFiscalYearFilter}>
           <SelectTrigger className="w-full md:w-[180px]">
             <SelectValue placeholder="Fiscal Year" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value={ALL_FISCAL_YEARS}>All Fiscal Years</SelectItem>
             {fiscalYears.map((year) => (
               <SelectItem key={year} value={year}>
                 {year}
@@ -309,7 +322,6 @@ export default function CompanyListPage() {
 
       <div className="rounded-md border bg-white dark:bg-gray-950 shadow-sm">
         <Table>
-
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">S.No</TableHead>
@@ -324,30 +336,47 @@ export default function CompanyListPage() {
           </TableHeader>
 
           <TableBody>
-
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-8" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-8" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-32" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-16" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-24" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-8 w-8 ml-auto" />
+                  </TableCell>
                 </TableRow>
               ))
             ) : filteredCompanies.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                  No companies found.
+                <TableCell
+                  colSpan={8}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  No companies found for the selected fiscal year.
                 </TableCell>
               </TableRow>
             ) : (
               filteredCompanies.map((company, index) => (
                 <TableRow key={company.id}>
-
                   <TableCell className="text-muted-foreground">
                     {index + 1}
                   </TableCell>
@@ -366,9 +395,7 @@ export default function CompanyListPage() {
                   <TableCell>{company.fiscalYear}</TableCell>
 
                   <TableCell>
-                    <Badge variant="outline">
-                      {company.category}
-                    </Badge>
+                    <Badge variant="outline">{company.category}</Badge>
                   </TableCell>
 
                   <TableCell>
@@ -380,9 +407,7 @@ export default function CompanyListPage() {
                             Contracted
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">
-                            Not Contracted
-                          </Badge>
+                          <Badge variant="secondary">Not Contracted</Badge>
                         )
                       ) : (
                         <Badge variant="outline">
@@ -406,9 +431,7 @@ export default function CompanyListPage() {
                   </TableCell>
 
                   <TableCell className="text-right">
-
                     <DropdownMenu>
-
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
                           <MoreHorizontal className="h-4 w-4" />
@@ -416,7 +439,6 @@ export default function CompanyListPage() {
                       </DropdownMenuTrigger>
 
                       <DropdownMenuContent align="end">
-
                         <Link href={`/dashboard/companies/${company.id}`}>
                           <DropdownMenuItem>
                             <Eye className="mr-2 h-4 w-4" />
@@ -425,7 +447,9 @@ export default function CompanyListPage() {
                         </Link>
 
                         {isApprovedStatus(company.approvalStatus) ? (
-                          <Link href={`/dashboard/companies/${company.id}/certificate`}>
+                          <Link
+                            href={`/dashboard/companies/${company.id}/certificate`}
+                          >
                             <DropdownMenuItem>
                               <FileBadge className="mr-2 h-4 w-4" />
                               Certificate
@@ -460,7 +484,7 @@ export default function CompanyListPage() {
                             onClick={() =>
                               setCompanyToDelete({
                                 id: company.id,
-                                name: company.name
+                                name: company.name,
                               })
                             }
                             className="text-red-600"
@@ -469,17 +493,12 @@ export default function CompanyListPage() {
                             Delete
                           </DropdownMenuItem>
                         )}
-
                       </DropdownMenuContent>
-
                     </DropdownMenu>
-
                   </TableCell>
-
                 </TableRow>
               ))
             )}
-
           </TableBody>
         </Table>
       </div>
@@ -490,13 +509,9 @@ export default function CompanyListPage() {
         open={!!companyToDelete}
         onOpenChange={(open) => !open && setCompanyToDelete(null)}
       >
-
         <AlertDialogContent>
-
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete Company?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Delete Company?</AlertDialogTitle>
 
             <AlertDialogDescription>
               This will permanently delete
@@ -505,10 +520,7 @@ export default function CompanyListPage() {
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-
-            <AlertDialogCancel>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
 
             <AlertDialogAction
               onClick={() => {
@@ -521,13 +533,9 @@ export default function CompanyListPage() {
             >
               Delete
             </AlertDialogAction>
-
           </AlertDialogFooter>
-
         </AlertDialogContent>
-
       </AlertDialog>
-
     </div>
   );
 }

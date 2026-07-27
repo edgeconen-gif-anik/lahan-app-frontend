@@ -2,7 +2,13 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { CalendarDays, Loader2, Save, ShieldAlert, UserRound } from "lucide-react";
+import {
+  CalendarDays,
+  Loader2,
+  Save,
+  ShieldAlert,
+  UserRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -106,7 +112,10 @@ export default function SetupPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <form
+        onSubmit={handleSubmit}
+        className="grid gap-6 lg:grid-cols-[1fr_320px]"
+      >
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -180,10 +189,12 @@ export default function SetupPage() {
 
             <div className="border-t pt-5">
               <div className="mb-4">
-                <h3 className="font-semibold">Company Registration Certificate</h3>
+                <h3 className="font-semibold">
+                  Company Registration Certificate
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  Official shown in the signature section of company registration
-                  certificates.
+                  Official shown in the signature section of company
+                  registration certificates.
                 </p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -243,7 +254,8 @@ export default function SetupPage() {
               Available Years
             </CardTitle>
             <CardDescription>
-              Years found from projects, committees, and the active setting.
+              Registered years are retained even when they have no records yet,
+              so switching the active year never removes another year.
             </CardDescription>
           </CardHeader>
           <CardContent>

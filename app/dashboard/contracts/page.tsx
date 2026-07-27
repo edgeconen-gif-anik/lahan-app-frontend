@@ -19,7 +19,12 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { CONTRACT_KEYS, useApproveContract, useContracts, useUpdateContractStatus } from "@/hooks/contract/useContracts";
+import {
+  CONTRACT_KEYS,
+  useApproveContract,
+  useContracts,
+  useUpdateContractStatus,
+} from "@/hooks/contract/useContracts";
 import { contractService } from "@/services/contract/contractService";
 import type { Contract, ContractStatus } from "@/lib/schema/contract/contract";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
@@ -34,17 +39,21 @@ import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
 type ImplementationFilter = "ALL" | "COMPANY" | "USER_COMMITTEE";
 type StatusFilter = "ALL" | ContractStatus;
 
-type TimeHealth = "not_started" | "ongoing" | "overdue" | "completed" | "archived";
+type TimeHealth =
+  "not_started" | "ongoing" | "overdue" | "completed" | "archived";
 
 const ACTIVE_CONTRACT_STATUS_ORDER = CONTRACT_STATUS_ORDER.filter(
-  (status) => status !== "ARCHIVED"
+  (status) => status !== "ARCHIVED",
 );
 
 function isContractStatus(value: string | null): value is ContractStatus {
   return CONTRACT_STATUS_ORDER.includes(value as ContractStatus);
 }
 
-function getStatusChangeBlockReason(contract: Contract, nextStatus: ContractStatus) {
+function getStatusChangeBlockReason(
+  contract: Contract,
+  nextStatus: ContractStatus,
+) {
   if (contract.status === nextStatus) return null;
   if (contract.status === "ARCHIVED") {
     return "Archived contracts cannot move to another milestone.";
@@ -80,20 +89,30 @@ function getNextStatusBlockReason(contract: Contract) {
   return nextStatus ? getStatusChangeBlockReason(contract, nextStatus) : null;
 }
 
-function getTimeHealth(contract: Pick<Contract, "startDate" | "intendedCompletionDate" | "actualCompletionDate" | "status">): TimeHealth {
+function getTimeHealth(
+  contract: Pick<
+    Contract,
+    "startDate" | "intendedCompletionDate" | "actualCompletionDate" | "status"
+  >,
+): TimeHealth {
   if (contract.status === "ARCHIVED") return "archived";
-  if (contract.status === "COMPLETED" || contract.actualCompletionDate) return "completed";
+  if (contract.status === "COMPLETED" || contract.actualCompletionDate)
+    return "completed";
 
   const now = new Date();
   const start = contract.startDate ? new Date(contract.startDate) : null;
-  const intended = contract.intendedCompletionDate ? new Date(contract.intendedCompletionDate) : null;
+  const intended = contract.intendedCompletionDate
+    ? new Date(contract.intendedCompletionDate)
+    : null;
 
   if (!start || now < start) return "not_started";
   if (intended && now > intended) return "overdue";
   return "ongoing";
 }
 
-function formatUserName(user?: { name?: string | null; email?: string | null } | null): string {
+function formatUserName(
+  user?: { name?: string | null; email?: string | null } | null,
+): string {
   return user?.name || user?.email || "Unknown user";
 }
 
@@ -124,7 +143,9 @@ function TimeHealthBadge({ contract }: { contract: Contract }) {
   };
 
   return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-medium ${content[health].className}`}>
+    <span
+      className={`inline-flex rounded-full px-2 py-1 text-[11px] font-medium ${content[health].className}`}
+    >
       {content[health].label}
     </span>
   );
@@ -151,8 +172,11 @@ function DeleteConfirmModal({
           <div className="flex-1">
             <h2 className="text-lg font-semibold">Delete Contract</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Delete <span className="font-mono font-semibold text-foreground">{contract.contractNumber}</span>?
-              This action cannot be undone.
+              Delete{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {contract.contractNumber}
+              </span>
+              ? This action cannot be undone.
             </p>
           </div>
         </div>
@@ -203,7 +227,9 @@ function StatusCard({
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className={`mt-2 text-2xl font-bold ${isActive ? "text-primary" : (accent ?? "")}`}>
+      <p
+        className={`mt-2 text-2xl font-bold ${isActive ? "text-primary" : (accent ?? "")}`}
+      >
         {value}
       </p>
     </button>
@@ -228,7 +254,9 @@ function ContractRow({
   onStatusChange: (status: ContractStatus) => void;
 }) {
   const canChangeStatus = isAdmin && contract.approvalStatus === "APPROVED";
-  const statusBlockReason = canChangeStatus ? getNextStatusBlockReason(contract) : null;
+  const statusBlockReason = canChangeStatus
+    ? getNextStatusBlockReason(contract)
+    : null;
   const implementor = contract.company
     ? {
         icon: <Building2 className="h-4 w-4 text-blue-500" />,
@@ -242,7 +270,8 @@ function ContractRow({
           sublabel: "User Committee",
         }
       : null;
-  const siteIncharge = contract.siteIncharge ?? contract.project?.siteIncharge ?? null;
+  const siteIncharge =
+    contract.siteIncharge ?? contract.project?.siteIncharge ?? null;
 
   return (
     <tr className="border-b align-top">
@@ -270,18 +299,27 @@ function ContractRow({
 
       <td className="px-4 py-4">
         <div className="space-y-1">
-          <div className="font-medium">{contract.project?.name ?? "Unlinked Project"}</div>
+          <div className="font-medium">
+            {contract.project?.name ?? "Unlinked Project"}
+          </div>
           {contract.project?.sNo && (
-            <div className="text-xs text-muted-foreground">S.No: {contract.project.sNo}</div>
+            <div className="text-xs text-muted-foreground">
+              S.No: {contract.project.sNo}
+            </div>
           )}
           {siteIncharge && (
             <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <User className="h-3 w-3" />
               <span>
                 Site Incharge:{" "}
-                <span className="font-medium text-foreground">{siteIncharge.name}</span>
+                <span className="font-medium text-foreground">
+                  {siteIncharge.name}
+                </span>
                 {siteIncharge.designation ? (
-                  <span className="text-muted-foreground"> ({siteIncharge.designation})</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    ({siteIncharge.designation})
+                  </span>
                 ) : null}
               </span>
             </div>
@@ -296,7 +334,9 @@ function ContractRow({
               {implementor.icon}
               <span className="font-medium">{implementor.label}</span>
             </div>
-            <div className="text-xs text-muted-foreground">{implementor.sublabel}</div>
+            <div className="text-xs text-muted-foreground">
+              {implementor.sublabel}
+            </div>
           </div>
         ) : (
           <span className="text-sm text-muted-foreground">Not assigned</span>
@@ -309,14 +349,23 @@ function ContractRow({
             <select
               value={contract.status}
               disabled={isUpdatingStatus}
-              onChange={(event) => onStatusChange(event.target.value as ContractStatus)}
+              onChange={(event) =>
+                onStatusChange(event.target.value as ContractStatus)
+              }
               className="h-9 rounded-md border bg-background px-3 text-sm"
             >
               {CONTRACT_STATUS_ORDER.map((status) => {
-                const blockReason = getStatusChangeBlockReason(contract, status);
+                const blockReason = getStatusChangeBlockReason(
+                  contract,
+                  status,
+                );
 
                 return (
-                  <option key={status} value={status} disabled={Boolean(blockReason)}>
+                  <option
+                    key={status}
+                    value={status}
+                    disabled={Boolean(blockReason)}
+                  >
                     {CONTRACT_STATUS_LABEL[status]}
                   </option>
                 );
@@ -330,9 +379,13 @@ function ContractRow({
               {statusBlockReason}
             </p>
           )}
-          {!canChangeStatus && isAdmin && contract.approvalStatus !== "APPROVED" && (
-            <p className="text-xs text-muted-foreground">Approve first to change milestone.</p>
-          )}
+          {!canChangeStatus &&
+            isAdmin &&
+            contract.approvalStatus !== "APPROVED" && (
+              <p className="text-xs text-muted-foreground">
+                Approve first to change milestone.
+              </p>
+            )}
           <TimeHealthBadge contract={contract} />
         </div>
       </td>
@@ -346,7 +399,7 @@ function ContractRow({
               <span className="font-medium text-foreground">
                 {contract.initiatedBy
                   ? formatUserName(contract.initiatedBy)
-                  : contract.initiatedById ?? "unknown user"}
+                  : (contract.initiatedById ?? "unknown user")}
               </span>
             </p>
           )}
@@ -435,19 +488,26 @@ function ContractLandingContent() {
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
   const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
-  const effectiveFiscalYear = fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
+  const effectiveFiscalYear =
+    fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
   const { data: contracts = [], isLoading } = useContracts({
     fiscalYear: effectiveFiscalYear || undefined,
   });
-  const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
-  const { mutate: updateContractStatus, isPending: isUpdatingStatus } = useUpdateContractStatus();
+  const { mutate: approveContract, isPending: isApprovingContract } =
+    useApproveContract();
+  const { mutate: updateContractStatus, isPending: isUpdatingStatus } =
+    useUpdateContractStatus();
 
   const [search, setSearch] = useState("");
   const [implementationFilter, setImplementationFilter] =
     useState<ImplementationFilter>("ALL");
   const statusParam = searchParams.get("status");
-  const statusFilter: StatusFilter = isContractStatus(statusParam) ? statusParam : "ALL";
-  const [contractToDelete, setContractToDelete] = useState<Contract | null>(null);
+  const statusFilter: StatusFilter = isContractStatus(statusParam)
+    ? statusParam
+    : "ALL";
+  const [contractToDelete, setContractToDelete] = useState<Contract | null>(
+    null,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
 
   const setStatusFilter = (nextStatus: StatusFilter) => {
@@ -467,17 +527,21 @@ function ContractLandingContent() {
 
   const baseFilteredContracts = useMemo(() => {
     return contracts.filter((contract) => {
-      const implementorName = contract.company?.name ?? contract.userCommittee?.name ?? "";
+      const implementorName =
+        contract.company?.name ?? contract.userCommittee?.name ?? "";
       const matchesSearch =
         !search ||
         contract.contractNumber.toLowerCase().includes(search.toLowerCase()) ||
-        (contract.project?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        (contract.project?.name ?? "")
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
         implementorName.toLowerCase().includes(search.toLowerCase());
 
       const matchesImplementation =
         implementationFilter === "ALL" ||
         (implementationFilter === "COMPANY" && Boolean(contract.company)) ||
-        (implementationFilter === "USER_COMMITTEE" && Boolean(contract.userCommittee));
+        (implementationFilter === "USER_COMMITTEE" &&
+          Boolean(contract.userCommittee));
 
       return matchesSearch && matchesImplementation;
     });
@@ -494,7 +558,7 @@ function ContractLandingContent() {
       CONTRACT_STATUS_ORDER.reduce<Record<ContractStatus, number>>(
         (acc, status) => {
           acc[status] = baseFilteredContracts.filter(
-            (contract) => contract.status === status
+            (contract) => contract.status === status,
           ).length;
           return acc;
         },
@@ -505,13 +569,13 @@ function ContractLandingContent() {
           WORKINPROGRESS: 0,
           COMPLETED: 0,
           ARCHIVED: 0,
-        }
+        },
       ),
-    [baseFilteredContracts]
+    [baseFilteredContracts],
   );
 
   const pendingApprovals = contracts.filter(
-    (contract) => contract.approvalStatus === "PENDING"
+    (contract) => contract.approvalStatus === "PENDING",
   ).length;
 
   const handleDeleteConfirm = async () => {
@@ -544,9 +608,12 @@ function ContractLandingContent() {
       <div className="space-y-6 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Contract Milestones</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Contract Milestones
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage contract milestones in one place and keep project, company, and user views in sync.
+              Manage contract milestones in one place and keep project, company,
+              and user views in sync.
             </p>
           </div>
           <button
@@ -579,7 +646,8 @@ function ContractLandingContent() {
 
         {isAdmin && (
           <div className="rounded-xl border bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Pending approvals: <span className="font-semibold">{pendingApprovals}</span>
+            Pending approvals:{" "}
+            <span className="font-semibold">{pendingApprovals}</span>
           </div>
         )}
 
@@ -600,6 +668,7 @@ function ContractLandingContent() {
             onChange={(event) => setFiscalYearFilter(event.target.value)}
             className="h-10 rounded-md border bg-background px-3 text-sm"
           >
+            <option value="all">All Fiscal Years</option>
             {fiscalYears.map((year) => (
               <option key={year} value={year}>
                 {year}
@@ -611,7 +680,9 @@ function ContractLandingContent() {
           <select
             value={implementationFilter}
             onChange={(event) =>
-              setImplementationFilter(event.target.value as ImplementationFilter)
+              setImplementationFilter(
+                event.target.value as ImplementationFilter,
+              )
             }
             className="h-10 rounded-md border bg-background px-3 text-sm"
           >
@@ -667,13 +738,19 @@ function ContractLandingContent() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                    <td
+                      colSpan={7}
+                      className="px-4 py-10 text-center text-muted-foreground"
+                    >
                       Loading contracts...
                     </td>
                   </tr>
                 ) : filteredContracts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                    <td
+                      colSpan={7}
+                      className="px-4 py-10 text-center text-muted-foreground"
+                    >
                       No contracts match the current filters.
                     </td>
                   </tr>
