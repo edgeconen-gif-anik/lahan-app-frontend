@@ -68,6 +68,7 @@ export default function EditCompanyPage() {
   // Our Zod schema and Form component expect actual JS Date objects.
   const defaultFormValues: Partial<CompanyFormValues> = {
     name: company.name,
+    fiscalYear: company.fiscalYear,
     panNumber: String(company.panNumber), // Ensure it's a string for the input
     voucherNo: company.voucherNo || "",
     officeRegistrationNumber: company.officeRegistrationNumber || "",

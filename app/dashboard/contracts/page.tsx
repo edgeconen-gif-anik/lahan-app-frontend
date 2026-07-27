@@ -600,7 +600,6 @@ function ContractLandingContent() {
             onChange={(event) => setFiscalYearFilter(event.target.value)}
             className="h-10 rounded-md border bg-background px-3 text-sm"
           >
-            <option value="">All Fiscal Years</option>
             {fiscalYears.map((year) => (
               <option key={year} value={year}>
                 {year}

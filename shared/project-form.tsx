@@ -188,8 +188,6 @@ export function ProjectForm({
   submitLabel,
 }: ProjectFormProps) {
   const { data: setup } = useSystemSetup();
-  const { data: companies = [] } = useCompanies({ limit: 200 });
-  const { data: committeesData } = useUserCommittees({ limit: 200 });
   const { data: usersData } = useUsers({ limit: 200 });
 
   const [formData, setFormData] = useState<ProjectFormState>(() =>
@@ -198,11 +196,19 @@ export function ProjectForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [didAttemptSubmit, setDidAttemptSubmit] = useState(false);
 
-  const committees = committeesData?.data ?? [];
   const users = usersData?.data ?? [];
   const effectiveFiscalYear =
     formData.fiscalYear ||
     (mode === "create" ? setup?.currentFiscalYear ?? "" : "");
+  const { data: companies = [] } = useCompanies({
+    limit: 200,
+    fiscalYear: effectiveFiscalYear || undefined,
+  });
+  const { data: committeesData } = useUserCommittees({
+    limit: 200,
+    fiscalYear: effectiveFiscalYear || undefined,
+  });
+  const committees = committeesData?.data ?? [];
   const effectiveFormData = {
     ...formData,
     fiscalYear: effectiveFiscalYear,

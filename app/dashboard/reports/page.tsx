@@ -183,6 +183,7 @@ function buildCompanyRows(
       values: {
         sn: index + 1,
         name: text(company.name),
+        fiscalYear: text(company.fiscalYear),
         panNumber: text(company.panNumber),
         category: text(company.category),
         address: text(company.address),
@@ -427,6 +428,7 @@ export default function ReportsPage() {
         columns: [
           { key: "sn", label: "S.No", align: "center" },
           { key: "name", label: "Company" },
+          { key: "fiscalYear", label: "Fiscal Year" },
           { key: "panNumber", label: "PAN" },
           { key: "category", label: "Category" },
           { key: "address", label: "Address" },

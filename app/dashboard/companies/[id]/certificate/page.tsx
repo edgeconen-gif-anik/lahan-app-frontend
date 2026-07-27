@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import QRCode from 'react-qr-code'; 
+import { useSystemSetup } from '@/hooks/setup/useSetup';
 
 // ✅ 1. Import Google Font optimized for Next.js
 import { Noto_Sans_Devanagari } from 'next/font/google';
@@ -33,6 +34,7 @@ export default function CompanyCertificatePage() {
   const id = params.id as string;
   
   const { data: company, isLoading, isError } = useCompany(id);
+  const { data: setup, isLoading: isSetupLoading } = useSystemSetup();
   const verificationUrl =
     typeof window !== "undefined" && company?.id
       ? `${window.location.origin}/dashboard/companies/${company.id}`
@@ -42,7 +44,7 @@ export default function CompanyCertificatePage() {
     window.print();
   };
 
-  if (isLoading) {
+  if (isLoading || isSetupLoading) {
     return (
       <div className="flex flex-col items-center justify-center mt-32 text-lg text-muted-foreground">
         <FaSpinner className="mb-4 h-8 w-8 animate-spin text-primary" />
@@ -163,8 +165,14 @@ export default function CompanyCertificatePage() {
               {/* ✅ Added underline and underline-offset-4 to this specific line */}
               <p className="font-semibold mb-6 underline underline-offset-4">दर्ता गर्ने अधिकारी</p>
               <p>........................................</p>
-              <p><span className="font-medium">नाम:</span> ई. अनिक यादव</p>
-              <p><span className="font-medium">पद:</span> ईन्जिनियर</p>
+              <p>
+                <span className="font-medium">नाम:</span>{" "}
+                {setup?.registrationOfficerName || "........................................"}
+              </p>
+              <p>
+                <span className="font-medium">पद:</span>{" "}
+                {setup?.registrationOfficerDesignation || "........................................"}
+              </p>
               <p>
                 <span className="font-medium">मिति:</span>{" "}
                 {registrationDateBs ? toNepaliDigits(registrationDateBs) : "—"}

@@ -57,6 +57,7 @@ import {
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
 
 import {
   AlertDialog,
@@ -72,8 +73,17 @@ import {
 export default function CompanyListPage() {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
-  const { data: companies = [], isLoading: isLoadingCompanies } = useCompanies();
-  const { data: contracts = [], isLoading: isLoadingContracts } = useContracts();
+  const { data: setup } = useSystemSetup();
+  const { data: fiscalYears = [] } = useFiscalYears();
+  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const effectiveFiscalYear =
+    fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
+  const { data: companies = [], isLoading: isLoadingCompanies } = useCompanies({
+    fiscalYear: effectiveFiscalYear || undefined,
+  });
+  const { data: contracts = [], isLoading: isLoadingContracts } = useContracts({
+    fiscalYear: effectiveFiscalYear || undefined,
+  });
   const { mutate: deleteCompany } = useDeleteCompany();
   const { mutate: approveCompany, isPending: isApprovingCompany } = useApproveCompany();
 
@@ -237,6 +247,23 @@ export default function CompanyListPage() {
           />
         </div>
 
+        <Select
+          value={effectiveFiscalYear}
+          onValueChange={setFiscalYearFilter}
+        >
+          <SelectTrigger className="w-full md:w-[180px]">
+            <SelectValue placeholder="Fiscal Year" />
+          </SelectTrigger>
+          <SelectContent>
+            {fiscalYears.map((year) => (
+              <SelectItem key={year} value={year}>
+                {year}
+                {year === setup?.currentFiscalYear ? " (Current)" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-full md:w-[180px]">
             <SelectValue placeholder="Category" />
@@ -288,6 +315,7 @@ export default function CompanyListPage() {
               <TableHead className="w-16">S.No</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>PAN</TableHead>
+              <TableHead>Fiscal Year</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Contact</TableHead>
@@ -303,6 +331,7 @@ export default function CompanyListPage() {
                   <TableCell><Skeleton className="h-4 w-8" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
@@ -311,7 +340,7 @@ export default function CompanyListPage() {
               ))
             ) : filteredCompanies.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   No companies found.
                 </TableCell>
               </TableRow>
@@ -333,6 +362,8 @@ export default function CompanyListPage() {
                   </TableCell>
 
                   <TableCell>{company.panNumber}</TableCell>
+
+                  <TableCell>{company.fiscalYear}</TableCell>
 
                   <TableCell>
                     <Badge variant="outline">

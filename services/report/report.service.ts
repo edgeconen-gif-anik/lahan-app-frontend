@@ -64,19 +64,19 @@ async function fetchAllProjects(params: ProjectQueryParams = {}) {
 
 export const reportService = {
   getData: async ({ fiscalYear }: ReportDataParams = {}): Promise<ReportData> => {
-    const scopedParams = fiscalYear ? { fiscalYear } : undefined;
+    const scopedParams = { fiscalYear: fiscalYear || "all" };
 
     const [companies, committeesResponse, contracts, projects] =
       await Promise.all([
-        companyService.getAll(),
+        companyService.getAll(scopedParams),
         userCommitteeService.getAll({
-          ...(scopedParams ?? {}),
+          ...scopedParams,
           page: 1,
           limit: 10000,
         }),
         contractService.getAll(scopedParams),
         fetchAllProjects({
-          ...(scopedParams ?? {}),
+          ...scopedParams,
           sortBy: "sNo",
           sortOrder: "asc",
         }),

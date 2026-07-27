@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { toFormalNepaliDate } from "@/lib/date-utils";
 import { sanitizeTenDigitPhone, TEN_DIGIT_PHONE_LENGTH } from "@/lib/validation/phone";
+import { useSystemSetup } from "@/hooks/setup/useSetup";
 
 interface CompanyFormProps {
   defaultValues?: Partial<CompanyFormValues>;
@@ -36,12 +37,14 @@ export function CompanyForm({
   buttonText,
   showOfficeRegistrationNumber = false,
 }: CompanyFormProps) {
+  const { data: setup } = useSystemSetup();
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     mode: "onTouched",
     reValidateMode: "onChange",
     defaultValues: {
       name: "",
+      fiscalYear: defaultValues?.fiscalYear ?? "",
       address: "Lahan, Siraha",
       category: "WORKS",
       panNumber: "",
@@ -61,6 +64,7 @@ export function CompanyForm({
     if (defaultValues) {
       form.reset({
         name: "",
+        fiscalYear: defaultValues.fiscalYear ?? "",
         address: "Lahan, Siraha",
         category: "WORKS",
         panNumber: "",
@@ -74,6 +78,18 @@ export function CompanyForm({
       });
     }
   }, [defaultValues, form]);
+
+  useEffect(() => {
+    if (
+      setup?.currentFiscalYear &&
+      !defaultValues?.fiscalYear &&
+      !form.getValues("fiscalYear")
+    ) {
+      form.setValue("fiscalYear", setup.currentFiscalYear, {
+        shouldValidate: true,
+      });
+    }
+  }, [defaultValues?.fiscalYear, form, setup?.currentFiscalYear]);
 
   const watchedRequestDate = form.watch("registrationRequestDate");
   const watchedRegDate = form.watch("registrationDate");
@@ -127,6 +143,25 @@ export function CompanyForm({
                   <FormControl>
                     <Input placeholder="e.g. ABC Construction Pvt Ltd" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="fiscalYear"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Fiscal Year <span className="text-red-500">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly className="bg-muted" />
+                  </FormControl>
+                  <FormDescription className="text-xs">
+                    Companies are registered within the active fiscal year.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

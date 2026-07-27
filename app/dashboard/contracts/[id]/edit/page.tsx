@@ -330,22 +330,28 @@ export default function EditContractPage() {
   const debouncedCommitteeSearch = useDebounce(committeeSearch);
   const debouncedSiteInchargeSearch = useDebounce(siteInchargeSearch);
   const debouncedRepresentativeSearch = useDebounce(representativeSearch);
+  const contractFiscalYear =
+    contract?.fiscalYear ?? contract?.project?.fiscalYear ?? undefined;
 
   const { data: baseProjectsRaw, isLoading: isLoadingBaseProjects } = useProjects({
     limit: 200,
+    fiscalYear: contractFiscalYear,
   });
   const { data: searchedProjectsRaw, isLoading: isLoadingSearchedProjects } = useProjects({
     enabled: Boolean(debouncedProjectSearch),
     limit: 200,
     search: debouncedProjectSearch,
+    fiscalYear: contractFiscalYear,
   });
   const { data: companies = [], isLoading: isLoadingCompanies } = useCompanies({
     limit: 200,
     search: debouncedCompanySearch || undefined,
+    fiscalYear: contractFiscalYear,
   });
   const { data: committeesRaw, isLoading: isLoadingCommittees } = useUserCommittees({
     limit: 200,
     search: debouncedCommitteeSearch || undefined,
+    fiscalYear: contractFiscalYear,
   });
   const { data: siteInchargesRaw, isLoading: isLoadingSiteIncharges } = useUsers({
     limit: 200,

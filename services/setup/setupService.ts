@@ -5,6 +5,8 @@ export type SystemSetup = {
   currentFiscalYear: string;
   chiefAdministrativeOfficerName?: string | null;
   sectionChiefName?: string | null;
+  registrationOfficerName?: string | null;
+  registrationOfficerDesignation?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -13,6 +15,8 @@ export type UpdateSystemSetupPayload = {
   currentFiscalYear: string;
   chiefAdministrativeOfficerName?: string | null;
   sectionChiefName?: string | null;
+  registrationOfficerName?: string | null;
+  registrationOfficerDesignation?: string | null;
 };
 
 export const setupService = {

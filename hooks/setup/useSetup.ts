@@ -50,6 +50,9 @@ export const useUpdateSystemSetup = () => {
         queryClient.invalidateQueries({ queryKey: ["projects"] }),
         queryClient.invalidateQueries({ queryKey: ["contracts"] }),
         queryClient.invalidateQueries({ queryKey: ["userCommittees"] }),
+        queryClient.invalidateQueries({ queryKey: ["companies"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["users", "dashboard"] }),
       ]);
     },
     onError: (error: unknown) => {

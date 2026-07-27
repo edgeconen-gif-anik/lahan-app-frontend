@@ -6,6 +6,9 @@ export const CompanyCategoryEnum = z.enum(["WORKS", "SUPPLY", "CONSULTING", "OTH
 
 export const companySchema = z.object({
   name: z.string().min(2, "Company name is required"),
+  fiscalYear: z
+    .string()
+    .regex(/^\d{4}\s*[/-]\s*\d{2,3}$/, "Use a fiscal year like 2082/083"),
   panNumber: z.string()
     .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN format. Must be 10 characters: 5 letters, 4 digits, 1 letter")
     .min(10, "PAN must be 10 characters")
@@ -46,6 +49,7 @@ export interface CompanyCounts {
 export interface Company
   extends Omit<CompanyFormValues, "registrationRequestDate" | "registrationDate"> {
   id: string;
+  fiscalYear: string;
   registrationRequestDate: string;
   registrationDate?: string | null;
   approvalStatus: ApprovalStatus;

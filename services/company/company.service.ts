@@ -23,6 +23,7 @@ export const companyService = {
     search?: string;
     limit?: number;
     page?: number;
+    fiscalYear?: string;
     approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
   }): Promise<Company[]> => {
     const { data } = await api.get("/companies", { params });

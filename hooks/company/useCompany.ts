@@ -21,6 +21,7 @@ export const useCompanies = (params?: {
   search?: string;
   limit?: number;
   page?: number;
+  fiscalYear?: string;
 }) => {
   return useQuery<Company[]>({
     queryKey: ["companies", params],

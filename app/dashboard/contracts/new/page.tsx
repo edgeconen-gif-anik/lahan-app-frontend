@@ -1200,8 +1200,13 @@ export default function NewContractPage() {
     isError: isUsersError,
     isLoading: isLoadingUsers,
   } = useUsers({ search: debouncedUserSearch }, { enabled: isAdmin });
-  const { data: companies, isLoading: isLoadingCompanies } = useCompanies();
-  const { data: userCommittees, isLoading: isLoadingUC } = useAllUserCommittees();
+  const { data: companies, isLoading: isLoadingCompanies } = useCompanies({
+    fiscalYear: currentFiscalYear,
+  });
+  const { data: userCommittees, isLoading: isLoadingUC } =
+    useAllUserCommittees({
+      fiscalYear: currentFiscalYear,
+    });
 
   const availableProjects = extractList<ContractProjectOption>(projects);
   const existingContractByProjectId = useMemo(

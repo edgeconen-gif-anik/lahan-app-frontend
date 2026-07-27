@@ -32,6 +32,8 @@ export default function SetupPage() {
     chiefAdministrativeOfficerName?: string;
     currentFiscalYear?: string;
     sectionChiefName?: string;
+    registrationOfficerName?: string;
+    registrationOfficerDesignation?: string;
   }>({});
   const [didSubmit, setDidSubmit] = useState(false);
 
@@ -43,6 +45,12 @@ export default function SetupPage() {
     "";
   const sectionChiefName =
     draft.sectionChiefName ?? setup?.sectionChiefName ?? "";
+  const registrationOfficerName =
+    draft.registrationOfficerName ?? setup?.registrationOfficerName ?? "";
+  const registrationOfficerDesignation =
+    draft.registrationOfficerDesignation ??
+    setup?.registrationOfficerDesignation ??
+    "";
 
   const fiscalYearError = useMemo(() => {
     if (!didSubmit) return "";
@@ -64,6 +72,9 @@ export default function SetupPage() {
       chiefAdministrativeOfficerName:
         chiefAdministrativeOfficerName.trim() || null,
       sectionChiefName: sectionChiefName.trim() || null,
+      registrationOfficerName: registrationOfficerName.trim() || null,
+      registrationOfficerDesignation:
+        registrationOfficerDesignation.trim() || null,
     });
   };
 
@@ -164,6 +175,51 @@ export default function SetupPage() {
                   }
                   placeholder="शाखा प्रमुखको नाम"
                 />
+              </div>
+            </div>
+
+            <div className="border-t pt-5">
+              <div className="mb-4">
+                <h3 className="font-semibold">Company Registration Certificate</h3>
+                <p className="text-xs text-muted-foreground">
+                  Official shown in the signature section of company registration
+                  certificates.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="registrationOfficerName">
+                    Registration Officer Name
+                  </Label>
+                  <Input
+                    id="registrationOfficerName"
+                    value={registrationOfficerName}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        registrationOfficerName: event.target.value,
+                      }))
+                    }
+                    placeholder="दर्ता गर्ने अधिकारीको नाम"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="registrationOfficerDesignation">
+                    Registration Officer Designation
+                  </Label>
+                  <Input
+                    id="registrationOfficerDesignation"
+                    value={registrationOfficerDesignation}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        registrationOfficerDesignation: event.target.value,
+                      }))
+                    }
+                    placeholder="दर्ता गर्ने अधिकारीको पद"
+                  />
+                </div>
               </div>
             </div>
 

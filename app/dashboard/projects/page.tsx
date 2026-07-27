@@ -248,7 +248,6 @@ export default function ProjectLandingPage() {
             setPage(1);
           }}
         >
-          <option value="">All Fiscal Years</option>
           {fiscalYears.map((year) => (
             <option key={year} value={year}>
               {year}

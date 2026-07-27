@@ -43,7 +43,8 @@ export default function CommitteeLandingPage() {
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("ALL");
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
-  const effectiveFiscalYear = fiscalYearFilter ?? "";
+  const effectiveFiscalYear =
+    fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
   const { data: committeesList = [], isLoading } = useAllUserCommittees({
     search,
     fiscalYear: effectiveFiscalYear || undefined,
@@ -110,7 +111,6 @@ export default function CommitteeLandingPage() {
           onChange={(event) => setFiscalYearFilter(event.target.value)}
           className="h-9 rounded-md border bg-background px-3 text-sm"
         >
-          <option value="">All Fiscal Years</option>
           {fiscalYears.map((year) => (
             <option key={year} value={year}>
               {year}
