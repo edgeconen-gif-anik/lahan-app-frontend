@@ -4,7 +4,11 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useApproveUser, useUsers } from "@/hooks/user/useUsers";
+import {
+  useApproveUser,
+  useCreateUser,
+  useUsers,
+} from "@/hooks/user/useUsers";
 import {
   Search,
   UserCircle,
@@ -14,8 +18,12 @@ import {
   AlertCircle,
   HardHat,
   ShieldCheck,
+  Plus,
+  X,
 } from "lucide-react";
 import { UserListItem, Designation, Role } from "@/lib/schema/user/user";
+import { isAdminRole, isSuperAdminRole } from "@/lib/auth/roles";
+import type { CreateUserPayload } from "@/services/user/user.service";
 import { toast } from "sonner";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -30,12 +38,14 @@ const ROLE_LABEL: Record<Role, string> = {
   CREATOR:  "Creator",
   REVIEWER: "Reviewer",
   ADMIN:    "Admin",
+  SUPER_ADMIN: "Super Admin",
 };
 
 const ROLE_COLOR: Record<Role, string> = {
   CREATOR:  "bg-blue-100 text-blue-700",
   REVIEWER: "bg-yellow-100 text-yellow-700",
   ADMIN:    "bg-purple-100 text-purple-700",
+  SUPER_ADMIN: "bg-rose-100 text-rose-700",
 };
 
 const APPROVAL_COLOR: Record<string, string> = {
@@ -69,13 +79,23 @@ function UserAvatar({ name, image }: { name?: string | null; image?: string | nu
 export default function UsersPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = isAdminRole(session?.user?.role);
+  const isSuperAdmin = isSuperAdminRole(session?.user?.role);
+  const createUser = useCreateUser();
 
   const [search,      setSearch]      = useState("");
   const [designation, setDesignation] = useState("");
   const [role,        setRole]        = useState("");
   const [approvalStatus, setApprovalStatus] = useState("");
   const [page,        setPage]        = useState(1);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newUser, setNewUser] = useState<CreateUserPayload>({
+    name: "",
+    email: "",
+    password: "",
+    role: "CREATOR",
+    designation: "SUB_ENGINEER",
+  });
   const LIMIT = 12;
 
   const { data, isLoading, isError } = useUsers(
@@ -101,6 +121,26 @@ export default function UsersPage() {
   const handleApprovalStatus = (v: string) => {
     setApprovalStatus(v);
     setPage(1);
+  };
+
+  const handleCreateUser = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    try {
+      await createUser.mutateAsync(newUser);
+      toast.success(`${ROLE_LABEL[newUser.role]} account created.`);
+      setNewUser({
+        name: "",
+        email: "",
+        password: "",
+        role: "CREATOR",
+        designation: "SUB_ENGINEER",
+      });
+      setShowCreateForm(false);
+      setPage(1);
+    } catch {
+      toast.error("Unable to create user. Check the email and try again.");
+    }
   };
 
   if (status === "loading") {
@@ -133,7 +173,125 @@ export default function UsersPage() {
             {meta ? `${meta.total} total users` : "Loading..."}
           </p>
         </div>
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={() => setShowCreateForm((current) => !current)}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            {showCreateForm ? <X size={16} /> : <Plus size={16} />}
+            {showCreateForm ? "Close" : "Create user"}
+          </button>
+        )}
       </div>
+
+      {isSuperAdmin && showCreateForm && (
+        <form
+          onSubmit={handleCreateUser}
+          className="rounded-lg border bg-card p-5 shadow-sm"
+        >
+          <div className="mb-4">
+            <h2 className="font-semibold">Create a user account</h2>
+            <p className="text-sm text-muted-foreground">
+              New accounts are approved immediately. Only the super admin can
+              create admins.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">Full name</span>
+              <input
+                required
+                minLength={3}
+                value={newUser.name}
+                onChange={(event) =>
+                  setNewUser((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                className="w-full rounded-md border bg-background px-3 py-2"
+              />
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">Email</span>
+              <input
+                required
+                type="email"
+                value={newUser.email}
+                onChange={(event) =>
+                  setNewUser((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
+                }
+                className="w-full rounded-md border bg-background px-3 py-2"
+              />
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">Temporary password</span>
+              <input
+                required
+                type="password"
+                minLength={6}
+                value={newUser.password}
+                onChange={(event) =>
+                  setNewUser((current) => ({
+                    ...current,
+                    password: event.target.value,
+                  }))
+                }
+                className="w-full rounded-md border bg-background px-3 py-2"
+              />
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">Role</span>
+              <select
+                value={newUser.role}
+                onChange={(event) =>
+                  setNewUser((current) => ({
+                    ...current,
+                    role: event.target.value as CreateUserPayload["role"],
+                  }))
+                }
+                className="w-full rounded-md border bg-background px-3 py-2"
+              >
+                <option value="CREATOR">Creator</option>
+                <option value="REVIEWER">Reviewer</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">Designation</span>
+              <select
+                value={newUser.designation}
+                onChange={(event) =>
+                  setNewUser((current) => ({
+                    ...current,
+                    designation: event.target.value as Designation,
+                  }))
+                }
+                className="w-full rounded-md border bg-background px-3 py-2"
+              >
+                <option value="ASSISTANT_SUB_ENGINEER">
+                  Asst. Sub-Engineer
+                </option>
+                <option value="SUB_ENGINEER">Sub-Engineer</option>
+                <option value="ENGINEER">Engineer</option>
+              </select>
+            </label>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={createUser.isPending}
+                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                {createUser.isPending ? "Creating..." : "Create account"}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
 
       {/* ── Filters ── */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -172,6 +330,7 @@ export default function UsersPage() {
           <option value="CREATOR">Creator</option>
           <option value="REVIEWER">Reviewer</option>
           <option value="ADMIN">Admin</option>
+          <option value="SUPER_ADMIN">Super Admin</option>
         </select>
 
         <select
@@ -214,6 +373,7 @@ export default function UsersPage() {
                 <UserCard
                   key={user.id}
                   user={user}
+                  canAssignAdmin={isSuperAdmin}
                   onClick={() => router.push(`/dashboard/users/${user.id}`)}
                 />
               ))}
@@ -250,7 +410,15 @@ export default function UsersPage() {
 
 // ─── UserCard component ───────────────────────────────────────────────────────
 
-function UserCard({ user, onClick }: { user: UserListItem; onClick: () => void }) {
+function UserCard({
+  user,
+  canAssignAdmin,
+  onClick,
+}: {
+  user: UserListItem;
+  canAssignAdmin: boolean;
+  onClick: () => void;
+}) {
   const approveUser = useApproveUser();
   const [approvalRole, setApprovalRole] = useState<Role>("CREATOR");
   const [approvalDesignation, setApprovalDesignation] =
@@ -337,7 +505,7 @@ function UserCard({ user, onClick }: { user: UserListItem; onClick: () => void }
             >
               <option value="CREATOR">Creator</option>
               <option value="REVIEWER">Reviewer</option>
-              <option value="ADMIN">Admin</option>
+              {canAssignAdmin && <option value="ADMIN">Admin</option>}
             </select>
             <select
               value={approvalDesignation}

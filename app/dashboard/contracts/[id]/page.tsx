@@ -812,7 +812,9 @@ export default function ContractDetailPage() {
   const { id }  = useParams();
   const [localStatus, setLocalStatus] = useState<ContractStatus | undefined>(undefined);
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
 
   const { data: contract, isLoading, error } = useContract(id as string);

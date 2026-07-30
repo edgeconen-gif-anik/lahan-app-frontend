@@ -17,7 +17,12 @@ export const DesignationEnum = z.enum([
   "ENGINEER",
 ]);
 
-export const RoleEnum = z.enum(["CREATOR", "REVIEWER", "ADMIN"]);
+export const RoleEnum = z.enum([
+  "CREATOR",
+  "REVIEWER",
+  "ADMIN",
+  "SUPER_ADMIN",
+]);
 export const ApprovalStatusEnum = z.enum(["PENDING", "APPROVED", "REJECTED"]);
 
 export const ProjectStatusEnum = z.enum([

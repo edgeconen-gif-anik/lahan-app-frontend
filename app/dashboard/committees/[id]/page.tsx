@@ -57,7 +57,9 @@ export default function CommitteeDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
 
   const { data: committee, isLoading } = useUserCommittee(id);
   const { data: contracts = [], isLoading: isLoadingContracts } = useContracts({

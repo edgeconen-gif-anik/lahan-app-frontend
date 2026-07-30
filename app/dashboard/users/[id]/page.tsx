@@ -41,6 +41,7 @@ const ROLE_LABEL: Record<Role, string> = {
   CREATOR:  "Creator",
   REVIEWER: "Reviewer",
   ADMIN:    "Admin",
+  SUPER_ADMIN: "Super Admin",
 };
 
 function formatCurrency(n: number) {
@@ -243,7 +244,9 @@ export default function UserProfilePage() {
   const router = useRouter();
   const userId = params.id as string;
   const { data: session, status } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
 
   const { data: profile, isLoading, isError } = useUserProfile(userId, {
     enabled: isAdmin,

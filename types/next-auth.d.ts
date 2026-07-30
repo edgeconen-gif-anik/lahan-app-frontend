@@ -1,5 +1,6 @@
 // types/next-auth.d.ts
 import { DefaultSession } from "next-auth";
+import type { AppRole } from "@/lib/auth/roles";
 
 declare module "next-auth" {
   /**
@@ -8,7 +9,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      role?: string; // Optional: If you want role in session
+      role?: AppRole;
     } & DefaultSession["user"];
     accessToken?: string; // <--- The fix: Add this!
     error?: string;
@@ -18,7 +19,7 @@ declare module "next-auth" {
   interface User {
     id: string;
     accessToken?: string; // Add this to the User type as well
-    role?: string;
+    role?: AppRole;
   }
 }
 
@@ -26,7 +27,7 @@ declare module "next-auth/jwt" {
   /** Returned by the `jwt` callback and `getToken`, when using JWT sessions */
   interface JWT {
     accessToken?: string;
-    role?: string;
+    role?: AppRole;
     id?: string;
     error?: string;
     sessionStartedAt?: number;

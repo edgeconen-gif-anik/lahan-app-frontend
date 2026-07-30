@@ -1158,7 +1158,9 @@ function WorkOrderForm({
 export default function NewContractPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const { data: setup } = useSystemSetup();
   const { mutateAsync: createContract, isPending } = useCreateContract();
   const [formData, setFormData] = useState<ContractFormData>(INITIAL_FORM_DATA);

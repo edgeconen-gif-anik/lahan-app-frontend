@@ -54,7 +54,9 @@ const getOfficialDetails = (officials: CommitteeOfficial[], role: string) => {
 
 export default function CommitteeLandingPage() {
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const [search, setSearch] = useState("");
   const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("ALL");

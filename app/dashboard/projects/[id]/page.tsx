@@ -15,7 +15,9 @@ import { ContractStatusBadge } from "@/components/contract-status-badge";
 export default function ProjectProfilePage() {
   const { id } = useParams();
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const { data: project, isLoading } = useProject(id as string);
   const { data: contracts = [], isLoading: isContractsLoading } = useContracts({
     projectId: id as string,

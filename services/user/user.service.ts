@@ -21,9 +21,23 @@ export interface UserListParams {
   limit?:       number;
 }
 
+export interface CreateUserPayload {
+  name: string;
+  email: string;
+  password: string;
+  designation: Designation;
+  role: Exclude<Role, "SUPER_ADMIN">;
+}
+
 // ─── User API service ─────────────────────────────────────────────────────────
 
 export const userService = {
+
+  // POST /users
+  async create(payload: CreateUserPayload) {
+    const { data } = await api.post("/users", payload);
+    return data;
+  },
 
   // GET /users?search=&designation=&role=&page=&limit=
   async getAll(params: UserListParams = {}): Promise<UserListResponse> {

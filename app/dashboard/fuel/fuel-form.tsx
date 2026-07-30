@@ -63,7 +63,9 @@ export function FuelForm({
   onSubmit,
 }: FuelFormProps) {
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const [form, setForm] = useState<FuelFormValues>({
     userId: defaultFuelLog?.userId ?? "",
     projectId: defaultFuelLog?.projectId ?? "",

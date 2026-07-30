@@ -29,7 +29,9 @@ const FISCAL_YEAR_PATTERN = /^\d{4}\s*[/-]\s*\d{2,3}$/;
 
 export default function SetupPage() {
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const { data: setup, isLoading } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
   const { mutate: updateSetup, isPending } = useUpdateSystemSetup();

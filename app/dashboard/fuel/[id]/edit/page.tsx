@@ -15,7 +15,9 @@ export default function EditFuelLogPage() {
   const params = useParams();
   const id = params.id as string;
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const { data: fuelLog, isLoading, isError } = useFuelLog(id);
   const { mutate: updateFuelLog, isPending } = useUpdateFuelLog();
 

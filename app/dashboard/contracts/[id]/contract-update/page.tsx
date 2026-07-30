@@ -146,7 +146,9 @@ export default function ContractUpdatePage() {
 
   const isArchived = contract.status === "ARCHIVED";
   const isCompleted = contract.status === "COMPLETED";
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const canEditCompletedContract = !isCompleted || isAdmin;
   const activeCompletionCode = completionCode ?? contract.completionCode ?? null;
 

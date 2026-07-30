@@ -73,7 +73,9 @@ import {
 
 export default function CompanyListPage() {
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
   const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);

@@ -32,7 +32,9 @@ type SidebarProps = React.HTMLAttributes<HTMLDivElement>;
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const visibleItems = isAdmin
     ? sidebarItems
     : sidebarItems.filter((item) => !item.adminOnly);

@@ -242,7 +242,9 @@ function FuelRow({
 
 export default function FuelLogsPage() {
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("ALL");

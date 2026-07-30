@@ -18,7 +18,9 @@ export default function EditProjectPage() {
   const router = useRouter();
   const id = params.id as string;
   const { data: session, status } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const { data: project, isLoading, isError } = useProject(id);
   const { mutate: updateProject, isPending } = useUpdateProject();
 

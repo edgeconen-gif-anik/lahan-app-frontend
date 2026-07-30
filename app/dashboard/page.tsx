@@ -77,7 +77,7 @@ export default function DashboardLandingPage() {
   const [showPendingTasks, setShowPendingTasks] = useState(false);
 
   const user = session?.user;
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(user?.role ?? "");
   const stats = dashboardData?.stats;
   const completionRate = stats?.completionRate ?? 0;
 

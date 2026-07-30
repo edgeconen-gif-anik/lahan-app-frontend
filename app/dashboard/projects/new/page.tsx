@@ -13,7 +13,9 @@ import { ProjectForm } from "@/shared/project-form";
 
 export default function NewProjectPage() {
   const { data: session, status } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
+    session?.user?.role ?? "",
+  );
   const { mutate: createProject, isPending } = useCreateProject();
 
   const handleSubmit = (values: ProjectFormValues) => {
