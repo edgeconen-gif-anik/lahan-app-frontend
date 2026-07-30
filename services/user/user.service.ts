@@ -72,4 +72,12 @@ export const userService = {
   async remove(id: string) {
     await api.delete(`/users/${id}`);
   },
+
+  // POST /auth/users/:id/send-verification-email
+  async sendVerificationEmail(id: string): Promise<{ message: string }> {
+    const { data } = await api.post(
+      `/auth/users/${id}/send-verification-email`,
+    );
+    return data;
+  },
 };

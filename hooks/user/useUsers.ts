@@ -87,3 +87,9 @@ export function useDeleteUser() {
     },
   });
 }
+
+export function useSendVerificationEmail() {
+  return useMutation({
+    mutationFn: (id: string) => userService.sendVerificationEmail(id),
+  });
+}

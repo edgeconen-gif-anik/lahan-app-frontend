@@ -8,6 +8,7 @@ import {
   useApproveUser,
   useCreateUser,
   useDeleteUser,
+  useSendVerificationEmail,
   useUsers,
 } from "@/hooks/user/useUsers";
 import {
@@ -25,6 +26,7 @@ import {
   Trash2,
   Eye,
   TriangleAlert,
+  MailCheck,
 } from "lucide-react";
 import { UserListItem, Designation, Role } from "@/lib/schema/user/user";
 import { isAdminRole, isSuperAdminRole } from "@/lib/auth/roles";
@@ -464,6 +466,7 @@ function UserCard({
 }) {
   const approveUser = useApproveUser();
   const deleteUser = useDeleteUser();
+  const sendVerificationEmail = useSendVerificationEmail();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [approvalRole, setApprovalRole] = useState<Role>("CREATOR");
   const [approvalDesignation, setApprovalDesignation] =
@@ -506,6 +509,17 @@ function UserCard({
     }
   };
 
+  const handleSendVerificationEmail = async () => {
+    try {
+      const result = await sendVerificationEmail.mutateAsync(user.id);
+      toast.success(result.message);
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Unable to send verification email."),
+      );
+    }
+  };
+
   return (
     <div
       role="button"
@@ -541,6 +555,17 @@ function UserCard({
                   <Eye className="mr-2 h-4 w-4" />
                   View profile
                 </DropdownMenuItem>
+                {!user.emailVerified && (
+                  <DropdownMenuItem
+                    disabled={sendVerificationEmail.isPending}
+                    onClick={() => void handleSendVerificationEmail()}
+                  >
+                    <MailCheck className="mr-2 h-4 w-4" />
+                    {sendVerificationEmail.isPending
+                      ? "Sending..."
+                      : "Send verification email"}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   disabled={isProtectedAccount}
