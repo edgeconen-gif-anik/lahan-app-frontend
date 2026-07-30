@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import {
   useApproveUser,
   useCreateUser,
+  useDeleteUser,
   useUsers,
 } from "@/hooks/user/useUsers";
 import {
@@ -20,11 +21,34 @@ import {
   ShieldCheck,
   Plus,
   X,
+  MoreVertical,
+  Trash2,
+  Eye,
+  TriangleAlert,
 } from "lucide-react";
 import { UserListItem, Designation, Role } from "@/lib/schema/user/user";
 import { isAdminRole, isSuperAdminRole } from "@/lib/auth/roles";
 import type { CreateUserPayload } from "@/services/user/user.service";
 import { toast } from "sonner";
+import axios from "axios";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -72,6 +96,15 @@ function UserAvatar({ name, image }: { name?: string | null; image?: string | nu
       {initials}
     </div>
   );
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (!axios.isAxiosError(error)) {
+    return fallback;
+  }
+
+  const message = error.response?.data?.message;
+  return typeof message === "string" ? message : fallback;
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -374,6 +407,12 @@ export default function UsersPage() {
                   key={user.id}
                   user={user}
                   canAssignAdmin={isSuperAdmin}
+                  currentUserId={session?.user?.id}
+                  onDeleted={() => {
+                    if (users.length === 1 && page > 1) {
+                      setPage((current) => Math.max(1, current - 1));
+                    }
+                  }}
                   onClick={() => router.push(`/dashboard/users/${user.id}`)}
                 />
               ))}
@@ -413,18 +452,26 @@ export default function UsersPage() {
 function UserCard({
   user,
   canAssignAdmin,
+  currentUserId,
+  onDeleted,
   onClick,
 }: {
   user: UserListItem;
   canAssignAdmin: boolean;
+  currentUserId?: string;
+  onDeleted: () => void;
   onClick: () => void;
 }) {
   const approveUser = useApproveUser();
+  const deleteUser = useDeleteUser();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [approvalRole, setApprovalRole] = useState<Role>("CREATOR");
   const [approvalDesignation, setApprovalDesignation] =
     useState<Designation>("SUB_ENGINEER");
   const isPending = user.approvalStatus === "PENDING";
   const canApprove = isPending && Boolean(user.emailVerified);
+  const isProtectedAccount =
+    user.id === currentUserId || user.role === "SUPER_ADMIN";
 
   const handleApprove = async (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -443,6 +490,22 @@ function UserCard({
     }
   };
 
+  const handleDelete = async () => {
+    try {
+      await deleteUser.mutateAsync(user.id);
+      setDeleteDialogOpen(false);
+      onDeleted();
+      toast.success(`${user.name ?? user.email ?? "User"} was deleted.`);
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Unable to delete this user. They may still be assigned to records.",
+        ),
+      );
+    }
+  };
+
   return (
     <div
       role="button"
@@ -457,10 +520,40 @@ function UserCard({
     >
       <div className="flex items-center gap-3">
         <UserAvatar name={user.name} image={user.image} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="font-semibold truncate">{user.name ?? "—"}</p>
           <p className="text-xs text-muted-foreground truncate">{user.email ?? "—"}</p>
         </div>
+        {canAssignAdmin && (
+          <div onClick={(event) => event.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Options for ${user.name ?? user.email ?? "user"}`}
+                  className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <MoreVertical size={17} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={onClick}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={isProtectedAccount}
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {isProtectedAccount ? "Protected account" : "Delete user"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -533,6 +626,54 @@ function UserCard({
           </button>
         </div>
       )}
+
+      <div
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <AlertDialog
+          open={deleteDialogOpen}
+          onOpenChange={(open) => {
+            if (!deleteUser.isPending) {
+              setDeleteDialogOpen(open);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogMedia className="bg-destructive/10 text-destructive">
+                <TriangleAlert />
+              </AlertDialogMedia>
+              <AlertDialogTitle>
+                Are you sure you want to delete this user?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                <span className="font-medium text-foreground">
+                  {user.name ?? "This user"} ({user.email ?? "no email"})
+                </span>{" "}
+                will permanently lose access. This action cannot be undone, and
+                deletion may be refused if the user is assigned to project or
+                contract records.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteUser.isPending}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={deleteUser.isPending}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleDelete();
+                }}
+              >
+                {deleteUser.isPending ? "Deleting..." : "Yes, delete user"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }

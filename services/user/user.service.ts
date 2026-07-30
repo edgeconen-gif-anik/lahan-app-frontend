@@ -67,4 +67,9 @@ export const userService = {
     const { data } = await api.patch(`/users/${id}/approve`, payload);
     return data;
   },
+
+  // DELETE /users/:id
+  async remove(id: string) {
+    await api.delete(`/users/${id}`);
+  },
 };
