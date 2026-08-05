@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { RegistrationInitiatorCell } from "@/components/registration-initiator-cell";
 import {
   AlertCircle,
   CheckCircle2,
@@ -250,7 +251,7 @@ export default function CommitteeLandingPage() {
       )}
 
       <div className="rounded-md border bg-card shadow-sm overflow-x-auto">
-        <Table className="min-w-[1180px]">
+        <Table className="min-w-[1320px]">
           <TableHeader>
             <TableRow>
               <TableHead className="text-center font-bold" rowSpan={2}>
@@ -270,6 +271,9 @@ export default function CommitteeLandingPage() {
               </TableHead>
               <TableHead className="font-bold" rowSpan={2}>
                 Account No.
+              </TableHead>
+              <TableHead className="font-bold" rowSpan={2}>
+                Initiator
               </TableHead>
               <TableHead className="font-bold" rowSpan={2}>
                 Approval
@@ -321,6 +325,9 @@ export default function CommitteeLandingPage() {
                     <Skeleton className="h-4 w-32" />
                   </TableCell>
                   <TableCell>
+                    <Skeleton className="h-4 w-28" />
+                  </TableCell>
+                  <TableCell>
                     <Skeleton className="h-4 w-32" />
                   </TableCell>
                   <TableCell>
@@ -334,7 +341,7 @@ export default function CommitteeLandingPage() {
             ) : visibleCommittees.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={11}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No committees found.
@@ -377,6 +384,11 @@ export default function CommitteeLandingPage() {
                     <TableCell>{committee.bankName}</TableCell>
                     <TableCell className="font-mono text-sm">
                       {committee.accountNumber}
+                    </TableCell>
+                    <TableCell>
+                      <RegistrationInitiatorCell
+                        initiator={committee.initiatedBy}
+                      />
                     </TableCell>
                     <TableCell>
                       <ApprovalStatusBadge status={committee.approvalStatus} />

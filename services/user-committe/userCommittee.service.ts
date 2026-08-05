@@ -1,5 +1,6 @@
 import api from "@/lib/api";
 import { ApprovalStatus } from "@/lib/schema/approval";
+import type { RegistrationInitiator } from "@/lib/schema/registration-initiator";
 
 export type CommitteeOfficial = {
   id?: string;
@@ -19,6 +20,8 @@ export type UserCommitteeRecord = {
   accountNumber: string;
   approvalStatus: ApprovalStatus;
   approvedAt?: string | null;
+  initiatedById?: string | null;
+  initiatedBy?: RegistrationInitiator | null;
   officials: CommitteeOfficial[];
 };
 

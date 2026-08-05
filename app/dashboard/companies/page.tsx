@@ -15,6 +15,7 @@ import {
 } from "@/lib/schema/company.schema";
 import { isApprovedStatus } from "@/lib/schema/approval";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { RegistrationInitiatorCell } from "@/components/registration-initiator-cell";
 
 import {
   Table,
@@ -328,6 +329,7 @@ export default function CompanyListPage() {
             <TableRow>
               <TableHead className="w-16">S.No</TableHead>
               <TableHead>Company</TableHead>
+              <TableHead>Initiator</TableHead>
               <TableHead>PAN</TableHead>
               <TableHead>Fiscal Year</TableHead>
               <TableHead>Category</TableHead>
@@ -346,6 +348,9 @@ export default function CompanyListPage() {
                   </TableCell>
                   <TableCell>
                     <Skeleton className="h-4 w-32" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-28" />
                   </TableCell>
                   <TableCell>
                     <Skeleton className="h-4 w-20" />
@@ -370,7 +375,7 @@ export default function CompanyListPage() {
             ) : filteredCompanies.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={9}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No companies found for the selected fiscal year.
@@ -390,6 +395,10 @@ export default function CompanyListPage() {
                     >
                       {company.name}
                     </Link>
+                  </TableCell>
+
+                  <TableCell>
+                    <RegistrationInitiatorCell initiator={company.initiatedBy} />
                   </TableCell>
 
                   <TableCell>{company.panNumber}</TableCell>

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ApprovalStatus } from "@/lib/schema/approval";
+import type { RegistrationInitiator } from "@/lib/schema/registration-initiator";
 import { TEN_DIGIT_PHONE_PATTERN } from "@/lib/validation/phone";
 
 export const CompanyCategoryEnum = z.enum(["WORKS", "SUPPLY", "CONSULTING", "OTHER"]);
@@ -56,6 +57,8 @@ export interface Company
   approvedAt?: string | null;
   isContracted: boolean;
   panVerified: boolean;
+  initiatedById?: string | null;
+  initiatedBy?: RegistrationInitiator | null;
   _count?: CompanyCounts;
   createdAt: string;
   updatedAt: string;
