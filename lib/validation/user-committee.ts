@@ -48,7 +48,7 @@ export function validateCommitteeForm(
   }
 
   if (!FISCAL_YEAR_PATTERN.test(formData.fiscalYear.trim())) {
-    errors.fiscalYear = "Fiscal year must be in 2082/083 or 2082/83 format.";
+    errors.fiscalYear = "Fiscal year must use YYYY/YYY or YYYY/YY format.";
   }
 
   if (!formData.formedDate) {

@@ -21,6 +21,7 @@ import { Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { toFormalNepaliDate } from "@/lib/date-utils";
 import { sanitizeTenDigitPhone, TEN_DIGIT_PHONE_LENGTH } from "@/lib/validation/phone";
 import { useSystemSetup } from "@/hooks/setup/useSetup";
+import { formatFiscalYearForDisplay } from "@/lib/fiscal-year";
 
 interface CompanyFormProps {
   defaultValues?: Partial<CompanyFormValues>;
@@ -221,7 +222,9 @@ export function CompanyForm({
                     <FormLabel>Office Registration Number</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g. 2082/83-001"
+                        placeholder={`e.g. ${formatFiscalYearForDisplay(
+                          setup?.currentFiscalYear,
+                        ) || "YYYY/YY"}-001`}
                         {...field}
                         value={field.value ?? ""}
                       />

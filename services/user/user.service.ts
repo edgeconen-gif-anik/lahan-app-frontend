@@ -29,6 +29,11 @@ export interface CreateUserPayload {
   role: Exclude<Role, "SUPER_ADMIN">;
 }
 
+export interface UpdateUserAccessPayload {
+  role: Exclude<Role, "SUPER_ADMIN">;
+  designation: Designation;
+}
+
 // ─── User API service ─────────────────────────────────────────────────────────
 
 export const userService = {
@@ -65,6 +70,11 @@ export const userService = {
 
   async approve(id: string, payload: { role: Role; designation: Designation }) {
     const { data } = await api.patch(`/users/${id}/approve`, payload);
+    return data;
+  },
+
+  async updateAccess(id: string, payload: UpdateUserAccessPayload) {
+    const { data } = await api.patch(`/users/${id}/access`, payload);
     return data;
   },
 

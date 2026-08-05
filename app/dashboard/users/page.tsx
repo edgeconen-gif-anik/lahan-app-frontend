@@ -9,6 +9,7 @@ import {
   useCreateUser,
   useDeleteUser,
   useSendVerificationEmail,
+  useUpdateUserAccess,
   useUsers,
 } from "@/hooks/user/useUsers";
 import {
@@ -31,6 +32,7 @@ import {
 import { UserListItem, Designation, Role } from "@/lib/schema/user/user";
 import { isAdminRole, isSuperAdminRole } from "@/lib/auth/roles";
 import type { CreateUserPayload } from "@/services/user/user.service";
+import type { UpdateUserAccessPayload } from "@/services/user/user.service";
 import { toast } from "sonner";
 import axios from "axios";
 import {
@@ -465,12 +467,22 @@ function UserCard({
   onClick: () => void;
 }) {
   const approveUser = useApproveUser();
+  const updateUserAccess = useUpdateUserAccess();
   const deleteUser = useDeleteUser();
   const sendVerificationEmail = useSendVerificationEmail();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [approvalRole, setApprovalRole] = useState<Role>("CREATOR");
   const [approvalDesignation, setApprovalDesignation] =
     useState<Designation>("SUB_ENGINEER");
+  const [showAccessEditor, setShowAccessEditor] = useState(false);
+  const [accessRole, setAccessRole] = useState<UpdateUserAccessPayload["role"]>(
+    user.role === "ADMIN" || user.role === "REVIEWER"
+      ? user.role
+      : "CREATOR",
+  );
+  const [accessDesignation, setAccessDesignation] = useState<Designation>(
+    user.designation ?? "SUB_ENGINEER",
+  );
   const isPending = user.approvalStatus === "PENDING";
   const canApprove = isPending && Boolean(user.emailVerified);
   const isProtectedAccount =
@@ -488,8 +500,26 @@ function UserCard({
         },
       });
       toast.success("User approved successfully.");
-    } catch {
-      toast.error("Unable to approve user.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Unable to approve user."));
+    }
+  };
+
+  const handleUpdateAccess = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+
+    try {
+      await updateUserAccess.mutateAsync({
+        id: user.id,
+        payload: {
+          role: accessRole,
+          designation: accessDesignation,
+        },
+      });
+      setShowAccessEditor(false);
+      toast.success("User access updated successfully.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Unable to update user access."));
     }
   };
 
@@ -564,6 +594,22 @@ function UserCard({
                     {sendVerificationEmail.isPending
                       ? "Sending..."
                       : "Send verification email"}
+                  </DropdownMenuItem>
+                )}
+                {!isPending && !isProtectedAccount && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (user.role && user.role !== "SUPER_ADMIN") {
+                        setAccessRole(user.role);
+                      }
+                      setAccessDesignation(
+                        user.designation ?? "SUB_ENGINEER",
+                      );
+                      setShowAccessEditor((current) => !current);
+                    }}
+                  >
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Manage access
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -649,6 +695,64 @@ function UserCard({
                 ? "Approve user"
                 : "Waiting for email verification"}
           </button>
+        </div>
+      )}
+
+      {canAssignAdmin && !isPending && !isProtectedAccount && showAccessEditor && (
+        <div
+          className="space-y-2 border-t pt-3"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <p className="text-xs font-medium text-muted-foreground">
+            Change role and designation
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={accessRole}
+              onChange={(event) =>
+                setAccessRole(
+                  event.target.value as UpdateUserAccessPayload["role"],
+                )
+              }
+              className="min-w-0 rounded-md border bg-background px-2 py-1.5 text-xs"
+            >
+              <option value="CREATOR">Creator</option>
+              <option value="REVIEWER">Reviewer</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+            <select
+              value={accessDesignation}
+              onChange={(event) =>
+                setAccessDesignation(event.target.value as Designation)
+              }
+              className="min-w-0 rounded-md border bg-background px-2 py-1.5 text-xs"
+            >
+              <option value="ASSISTANT_SUB_ENGINEER">Asst. Sub-Engineer</option>
+              <option value="SUB_ENGINEER">Sub-Engineer</option>
+              <option value="ENGINEER">Engineer</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowAccessEditor(false);
+              }}
+              disabled={updateUserAccess.isPending}
+              className="rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleUpdateAccess}
+              disabled={updateUserAccess.isPending}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {updateUserAccess.isPending ? "Saving..." : "Save access"}
+            </button>
+          </div>
         </div>
       )}
 

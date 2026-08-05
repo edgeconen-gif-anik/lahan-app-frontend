@@ -328,7 +328,9 @@ export function ProjectForm({
               id="fiscalYear"
               value={effectiveFiscalYear}
               onChange={(event) => handleChange("fiscalYear", event.target.value)}
-              placeholder="2082/083"
+              placeholder="YYYY/YYY"
+              readOnly={mode === "create"}
+              className={mode === "create" ? "bg-muted" : undefined}
               aria-invalid={Boolean(errors.fiscalYear)}
             />
           </FieldShell>

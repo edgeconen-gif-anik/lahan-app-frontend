@@ -255,14 +255,15 @@ export default function RegisterCommitteePage() {
               <Input
                 id="fiscalYear"
                 name="fiscalYear"
-                placeholder="2082/083"
+                placeholder="YYYY/YYY"
                 value={effectiveFormData.fiscalYear}
                 onBlur={() => markFieldTouched("fiscalYear")}
-                onChange={handleInputChange}
+                readOnly
+                className="bg-muted"
                 aria-invalid={Boolean(getFieldError("fiscalYear"))}
               />
               <p className="text-xs text-muted-foreground">
-                Use the format `2082/083`.
+                New committees use the active fiscal year from system setup.
               </p>
               {getFieldError("fiscalYear") && (
                 <p className="text-xs font-medium text-destructive">

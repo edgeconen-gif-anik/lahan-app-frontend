@@ -11,6 +11,10 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import QRCode from 'react-qr-code'; 
 import { useSystemSetup } from '@/hooks/setup/useSetup';
+import {
+  formatFiscalYearForDisplay,
+  getFiscalYearCode,
+} from '@/lib/fiscal-year';
 
 // ✅ 1. Import Google Font optimized for Next.js
 import { Noto_Sans_Devanagari } from 'next/font/google';
@@ -83,7 +87,14 @@ export default function CompanyCertificatePage() {
     ? toNepaliDate(company.registrationDate)
     : "";
 
-  const shortUid = company.id ? `CMP-${company.id.substring(0, 7).toUpperCase()}-8283` : "";
+  const certificateFiscalYear =
+    company.fiscalYear || setup?.currentFiscalYear || "";
+  const fiscalYearCode = getFiscalYearCode(certificateFiscalYear);
+  const shortUid = company.id
+    ? `CMP-${company.id.substring(0, 7).toUpperCase()}${
+        fiscalYearCode ? `-${fiscalYearCode}` : ""
+      }`
+    : "";
 
   return (
     <div className="bg-slate-100 p-4 sm:p-6 lg:p-8 font-sans min-h-screen">
@@ -137,7 +148,10 @@ export default function CompanyCertificatePage() {
           <p className="mt-6 indent-8 text-justify">
             श्री <strong>{company.name}</strong>,{' '}
             <strong>{company.address}</strong> बाट यस लहान नगरपालिकाको
-            कार्यालयमा आर्थिक वर्ष <strong>{toNepaliDigits('२०८२/८३')}</strong>{' '}
+            कार्यालयमा आर्थिक वर्ष{' '}
+            <strong>
+              {toNepaliDigits(formatFiscalYearForDisplay(certificateFiscalYear))}
+            </strong>{' '}
             का लागि <strong>{categoryLabel(company.category)}</strong> प्रयोजनार्थ
             मौजुदा सूचीमा सूचीकृत हुन पाउँ भनि मिति{' '}
             <strong>{toNepaliDigits(requestDateBs)}</strong> मा यस

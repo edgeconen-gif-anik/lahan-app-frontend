@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   CreateUserPayload,
+  UpdateUserAccessPayload,
   userService,
   UserListParams,
 } from "@/services/user/user.service"
@@ -71,6 +72,23 @@ export function useCreateUser() {
 
   return useMutation({
     mutationFn: (payload: CreateUserPayload) => userService.create(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all() });
+    },
+  });
+}
+
+export function useUpdateUserAccess() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: UpdateUserAccessPayload;
+    }) => userService.updateAccess(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.all() });
     },

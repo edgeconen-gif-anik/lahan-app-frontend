@@ -10,6 +10,22 @@ export function normalizeFiscalYear(value?: string | null) {
   return `${startYear}/${endYear.slice(-3).padStart(3, "0")}`;
 }
 
+export function formatFiscalYearForDisplay(value?: string | null) {
+  const normalized = normalizeFiscalYear(value);
+  if (!normalized) return value?.trim() ?? "";
+
+  const [startYear, endYear] = normalized.split("/");
+  return `${startYear}/${endYear.slice(-2)}`;
+}
+
+export function getFiscalYearCode(value?: string | null) {
+  const normalized = normalizeFiscalYear(value);
+  if (!normalized) return "";
+
+  const [startYear, endYear] = normalized.split("/");
+  return `${startYear.slice(-2)}${endYear.slice(-2)}`;
+}
+
 export function mergeFiscalYears(
   years: string[] | undefined,
   ...additionalYears: Array<string | null | undefined>

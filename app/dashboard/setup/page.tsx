@@ -64,7 +64,7 @@ export default function SetupPage() {
     if (!didSubmit) return "";
     return FISCAL_YEAR_PATTERN.test(currentFiscalYear.trim())
       ? ""
-      : "Use a fiscal year like 2082/083 or 2082/83.";
+      : "Use YYYY/YYY or YYYY/YY format.";
   }, [currentFiscalYear, didSubmit]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -141,7 +141,7 @@ export default function SetupPage() {
                     currentFiscalYear: event.target.value,
                   }))
                 }
-                placeholder="2082/083"
+                placeholder="YYYY/YYY"
                 aria-invalid={Boolean(fiscalYearError)}
               />
               {fiscalYearError ? (
@@ -150,7 +150,7 @@ export default function SetupPage() {
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Accepted formats: 2082/083, 2082/83, 2082-083.
+                  Accepted formats: YYYY/YYY, YYYY/YY, or YYYY-YYY.
                 </p>
               )}
             </div>
