@@ -899,6 +899,7 @@ function SignatureFields({
           className={getInputClassName(false, "h-10 px-3 py-2")}
           placeholder="Full name"
         />
+        <p className="mt-1 text-xs text-muted-foreground">Leave blank to use the recorded appointment for the document date when saved. Enter the actual signatory for historical documents without appointment history.</p>
       </Field>
       <Field label={contractorLabel}>
         <input
@@ -1186,9 +1187,9 @@ export default function NewContractPage() {
   const debouncedProjectSearch = useDebounce(projectSearch, 350);
   const debouncedUserSearch = useDebounce(userSearch, 350);
   const currentFiscalYear = setup?.currentFiscalYear;
-  const defaultOfficeSignatory =
-    setup?.chiefAdministrativeOfficerName?.trim() ?? "";
-  const defaultSectionChiefName = setup?.sectionChiefName?.trim() ?? "";
+  // The server resolves defaults using the document date when it is saved.
+  const defaultOfficeSignatory = "";
+  const defaultSectionChiefName = "";
 
   const { data: projects, isLoading: isLoadingProjects } = useProjects({
     search: debouncedProjectSearch,

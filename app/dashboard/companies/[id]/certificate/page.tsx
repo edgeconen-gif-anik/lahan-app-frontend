@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import QRCode from 'react-qr-code'; 
-import { useSystemSetup } from '@/hooks/setup/useSetup';
+import { CompanyOfficerVerification } from '@/components/company-officer-verification';
 import {
   formatFiscalYearForDisplay,
   getFiscalYearCode,
@@ -38,7 +38,6 @@ export default function CompanyCertificatePage() {
   const id = params.id as string;
   
   const { data: company, isLoading, isError } = useCompany(id);
-  const { data: setup, isLoading: isSetupLoading } = useSystemSetup();
   const verificationUrl =
     typeof window !== "undefined" && company?.id
       ? `${window.location.origin}/dashboard/companies/${company.id}`
@@ -48,7 +47,7 @@ export default function CompanyCertificatePage() {
     window.print();
   };
 
-  if (isLoading || isSetupLoading) {
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center mt-32 text-lg text-muted-foreground">
         <FaSpinner className="mb-4 h-8 w-8 animate-spin text-primary" />
@@ -79,6 +78,10 @@ export default function CompanyCertificatePage() {
     );
   }
 
+  if (!company.officerSnapshotAt || !company.registrationOfficerName || !company.registrationOfficerDesignation) {
+    return <CompanyOfficerVerification id={company.id} updatedAt={company.updatedAt} />;
+  }
+
   const requestDateBs = company.registrationRequestDate 
     ? toNepaliDate(company.registrationRequestDate) 
     : "";
@@ -88,7 +91,7 @@ export default function CompanyCertificatePage() {
     : "";
 
   const certificateFiscalYear =
-    company.fiscalYear || setup?.currentFiscalYear || "";
+    company.fiscalYear || "";
   const fiscalYearCode = getFiscalYearCode(certificateFiscalYear);
   const shortUid = company.id
     ? `CMP-${company.id.substring(0, 7).toUpperCase()}${
@@ -181,11 +184,11 @@ export default function CompanyCertificatePage() {
               <p>........................................</p>
               <p>
                 <span className="font-medium">नाम:</span>{" "}
-                {setup?.registrationOfficerName || "........................................"}
+                {company.registrationOfficerName}
               </p>
               <p>
                 <span className="font-medium">पद:</span>{" "}
-                {setup?.registrationOfficerDesignation || "........................................"}
+                {company.registrationOfficerDesignation}
               </p>
               <p>
                 <span className="font-medium">मिति:</span>{" "}

@@ -23,6 +23,7 @@ import {
   useFiscalYears,
   useSystemSetup,
   useUpdateSystemSetup,
+  useOfficerAssignments,
 } from "@/hooks/setup/useSetup";
 
 const FISCAL_YEAR_PATTERN = /^\d{4}\s*[/-]\s*\d{2,3}$/;
@@ -35,6 +36,9 @@ export default function SetupPage() {
   const { data: setup, isLoading } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
   const { mutate: updateSetup, isPending } = useUpdateSystemSetup();
+  const { data: assignments = [], isError: historyError } = useOfficerAssignments(isAdmin);
+  const [effectiveFrom, setEffectiveFrom] = useState("");
+  const [changeReason, setChangeReason] = useState("");
 
   const [draft, setDraft] = useState<{
     chiefAdministrativeOfficerName?: string;
@@ -76,6 +80,8 @@ export default function SetupPage() {
     }
 
     updateSetup({
+      officerEffectiveFrom: effectiveFrom ? new Date(effectiveFrom).toISOString() : undefined,
+      officerChangeReason: changeReason.trim() || undefined,
       currentFiscalYear: currentFiscalYear.trim(),
       chiefAdministrativeOfficerName:
         chiefAdministrativeOfficerName.trim() || null,
@@ -83,7 +89,7 @@ export default function SetupPage() {
       registrationOfficerName: registrationOfficerName.trim() || null,
       registrationOfficerDesignation:
         registrationOfficerDesignation.trim() || null,
-    });
+    }, { onSuccess: () => { setDraft({}); setEffectiveFrom(""); setChangeReason(""); } });
   };
 
   if (!isAdmin) {
@@ -236,7 +242,16 @@ export default function SetupPage() {
               </div>
             </div>
 
+            <div className="space-y-3 border-t pt-5">
+              <p className="text-sm text-muted-foreground">Officer changes take effect when saved. Each appointment lasts until the next recorded appointment, including changes within the same fiscal year. Saved document officers remain unchanged.</p>
+              <Label htmlFor="officer-effective-from">Historical appointment start (AD, local time; optional)</Label>
+              <Input id="officer-effective-from" type="datetime-local" value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)} />
+              <p className="text-xs text-muted-foreground">For a historical appointment, enter all four official fields as they were at that time. It ends at the next entry below. Existing certificates require individual verification; history entries do not rewrite them.</p>
+              <Label htmlFor="officer-change-reason">Appointment order / supporting document reference</Label>
+              <Input id="officer-change-reason" value={changeReason} required={Boolean(effectiveFrom)} minLength={10} maxLength={2000} onChange={(event) => setChangeReason(event.target.value)} />
+            </div>
             <div className="flex justify-end">
+              <span className="sr-only">Save officer assignment and fiscal year</span>
               <Button type="submit" disabled={isPending || isLoading}>
                 {isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -287,6 +302,27 @@ export default function SetupPage() {
           </CardContent>
         </Card>
       </form>
+      <Card>
+        <CardHeader>
+          <CardTitle>Officer assignment history</CardTitle>
+          <CardDescription>Newest first. Each start time is inclusive; the next appointment ends that period. The migration baseline confirms settings only from its recorded time.</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {historyError ? <p>Unable to load officer history. Refresh to try again.</p> : (
+            <table className="w-full text-left text-sm">
+              <thead><tr><th className="p-2">Effective from (local)</th><th className="p-2">Registration officer / designation</th><th className="p-2">Chief administrative officer / section chief</th><th className="p-2">Audit reference</th></tr></thead>
+              <tbody>{assignments.map((assignment) => (
+                <tr key={assignment.id} className="border-t">
+                  <td className="p-2">{new Date(assignment.effectiveFrom).toLocaleString()}</td>
+                  <td className="p-2">{assignment.registrationOfficerName || "—"}<br />{assignment.registrationOfficerDesignation || "—"}</td>
+                  <td className="p-2">{assignment.chiefAdministrativeOfficerName || "—"}<br />{assignment.sectionChiefName || "—"}</td>
+                  <td className="p-2">{assignment.reason || "Settings change / migration baseline"}<br /><span className="text-xs text-muted-foreground">{assignment.recordedById || "Migration"} · {new Date(assignment.recordedAt).toLocaleString()}</span></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

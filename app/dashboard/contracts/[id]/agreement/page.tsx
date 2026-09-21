@@ -17,13 +17,11 @@ import {
   toNepaliDigits,
 } from "@/lib/contract-document-nepali";
 import { getContractDocumentVariant } from "@/lib/contract-documents";
-import { useSystemSetup } from "@/hooks/setup/useSetup";
 
 const EMPLOYER_NAME =
   "लहान नगरपालिका, नगर कार्यपालिकाको कार्यालय, लहान, सिराहा";
 const MUNICIPAL_OFFICE_NAME = "लहान न.पा. नगर कार्यपालिकाको कार्यालय";
 const MUNICIPAL_PHONE = "०३३६३१३७";
-const DEFAULT_COMPANY_WITNESS_NAMES = "ई. अनिक यादव, ई. विनोद कुमार यादव";
 const EMPTY_SIGNATURE_VALUE = "........................";
 const BLANK_LINE = "........................";
 
@@ -669,7 +667,6 @@ function AgreementContent() {
   const { data: company } = useCompany(contract?.companyId ?? "");
   const { data: committee } = useUserCommittee(contract?.userCommitteeId ?? "");
   const { data: project } = useProject(contract?.projectId ?? "");
-  const { data: setup } = useSystemSetup();
 
   if (isLoading) {
     return (
@@ -744,7 +741,7 @@ function AgreementContent() {
         postBodyContent={
           <CommitteeAgreementBody
             agreementDate={agreementDate}
-            caoName={setup?.chiefAdministrativeOfficerName}
+            caoName={contract.agreement?.officeSignatory}
             committee={committee}
             contractAmount={agreementAmountValue}
             endDate={formatNepaliDate(contract.intendedCompletionDate)}
@@ -789,12 +786,11 @@ function AgreementContent() {
       });
   const customNote = getCustomAgreementNote(contract);
   const officeSignatory =
-    contract.agreement?.officeSignatory?.trim() ||
-    setup?.chiefAdministrativeOfficerName?.trim();
+    contract.agreement?.officeSignatory?.trim();
   const configuredWitnessName =
-    contract.agreement?.witnessName?.trim() || setup?.sectionChiefName?.trim();
+    contract.agreement?.witnessName?.trim();
   const companyWitnessName =
-    configuredWitnessName || DEFAULT_COMPANY_WITNESS_NAMES;
+    configuredWitnessName || EMPTY_SIGNATURE_VALUE;
   const agreementSignatures = isCompanyAgreement
     ? []
     : [

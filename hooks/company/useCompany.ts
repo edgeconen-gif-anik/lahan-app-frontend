@@ -37,6 +37,18 @@ export const useCompany = (id: string) => {
   });
 };
 
+export const useVerifyCompanyOfficer = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: companyService.verifyOfficer,
+    onSuccess: () => {
+      toast.success("Historical officer verified and saved");
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+    },
+    onError: (error: unknown) => toast.error(getErrorMessage(error, "Failed to verify officer")),
+  });
+};
+
 export const useCreateCompany = () => {
   const queryClient = useQueryClient();
   const router = useRouter();

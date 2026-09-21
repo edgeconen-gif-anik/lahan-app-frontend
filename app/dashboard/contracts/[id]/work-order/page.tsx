@@ -13,7 +13,6 @@ import {
   formatNepaliDate,
   getCustomWorkOrderNote,
 } from "@/lib/contract-document-nepali";
-import { useSystemSetup } from "@/hooks/setup/useSetup";
 
 function getDesignationLabel(designation?: string | null) {
   switch (designation) {
@@ -76,7 +75,6 @@ function WorkOrderContent() {
   const { data: company } = useCompany(contract?.companyId ?? "");
   const { data: committee } = useUserCommittee(contract?.userCommitteeId ?? "");
   const { data: project } = useProject(contract?.projectId ?? "");
-  const { data: setup } = useSystemSetup();
 
   if (isLoading) {
     return (
@@ -120,10 +118,9 @@ function WorkOrderContent() {
     .filter(Boolean)
     .join(" ");
   const chiefAdministrativeOfficerName =
-    contract.workOrder?.officeSignatory?.trim() ||
-    setup?.chiefAdministrativeOfficerName?.trim();
+    contract.workOrder?.officeSignatory?.trim();
   const sectionChiefName =
-    contract.workOrder?.witnessName?.trim() || setup?.sectionChiefName?.trim();
+    contract.workOrder?.witnessName?.trim();
   const appendixSections = [
     {
       title: "सादर अवगतार्थ:",

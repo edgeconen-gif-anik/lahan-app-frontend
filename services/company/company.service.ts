@@ -19,6 +19,10 @@ function normalizeCompanyListResponse(payload: unknown): Company[] {
 }
 
 export const companyService = {
+  verifyOfficer: async ({ id, ...payload }: { id: string; expectedUpdatedAt: string; registrationOfficerName: string; registrationOfficerDesignation: string; evidence: string }) => {
+    const { data } = await api.patch<Company>(`/companies/${id}/verify-officer`, payload);
+    return data;
+  },
   getAll: async (params?: {
     search?: string;
     limit?: number;

@@ -33,6 +33,12 @@ export const useSystemSetup = () => {
   });
 };
 
+export const useOfficerAssignments = (enabled: boolean) => useQuery({
+  queryKey: [...SETUP_KEYS.all, "officer-assignments"],
+  queryFn: setupService.getOfficerAssignments,
+  enabled,
+});
+
 export const useFiscalYears = () => {
   return useQuery({
     queryKey: SETUP_KEYS.fiscalYears(),

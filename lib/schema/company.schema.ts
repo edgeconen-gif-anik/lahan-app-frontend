@@ -55,6 +55,12 @@ export interface Company
   registrationDate?: string | null;
   approvalStatus: ApprovalStatus;
   approvedAt?: string | null;
+  registrationOfficerName?: string | null;
+  registrationOfficerDesignation?: string | null;
+  officerSnapshotAt?: string | null;
+  officerSnapshotSource?: string | null;
+  officerVerifiedById?: string | null;
+  officerVerificationNote?: string | null;
   isContracted: boolean;
   panVerified: boolean;
   initiatedById?: string | null;
