@@ -11,6 +11,7 @@ import {
   Building2,
   CalendarClock,
   CheckCircle2,
+  Download,
   Eye,
   FileText,
   Plus,
@@ -35,6 +36,7 @@ import {
 } from "@/components/contract-status-badge";
 import { toNepaliDate } from "@/lib/date-utils";
 import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
+import { downloadCsv } from "@/lib/report-export";
 
 type ImplementationFilter = "ALL" | "COMPANY" | "USER_COMMITTEE";
 type StatusFilter = "ALL" | ContractStatus;
@@ -492,7 +494,7 @@ function ContractLandingContent() {
   const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
   const effectiveFiscalYear =
     fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
-  const { data: contracts = [], isLoading } = useContracts({
+  const { data: contracts = [], isLoading, isFetching, isError } = useContracts({
     fiscalYear: effectiveFiscalYear || undefined,
   });
   const { mutate: approveContract, isPending: isApprovingContract } =
@@ -580,6 +582,35 @@ function ContractLandingContent() {
     (contract) => contract.approvalStatus === "PENDING",
   ).length;
 
+  const handleDownloadReport = () => {
+    const scope = effectiveFiscalYear && effectiveFiscalYear !== "all"
+      ? effectiveFiscalYear.replace(/[^\dA-Za-z-]/g, "-")
+      : "all-years";
+    downloadCsv(
+      `contract-report-${scope}-${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" })}.csv`,
+      filteredContracts.map((contract, index) => ({
+        "S.No": index + 1,
+        "Contract No.": contract.contractNumber,
+        "Fiscal Year": contract.fiscalYear ?? contract.project?.fiscalYear ?? "",
+        Project: contract.project?.name ?? "",
+        "Project S.No": contract.project?.sNo ?? "",
+        "Implementor Type": contract.company ? "Company" : contract.userCommittee ? "User Committee" : "",
+        Implementor: contract.company?.name ?? contract.userCommittee?.name ?? "",
+        Milestone: CONTRACT_STATUS_LABEL[contract.status],
+        Approval: contract.approvalStatus,
+        "Contract Amount (Rs.)": Number(contract.contractAmount),
+        "Final Evaluated Amount (Rs.)": contract.finalEvaluatedAmount == null ? "" : Number(contract.finalEvaluatedAmount),
+        "Start Date (BS)": contract.startDate ? toNepaliDate(contract.startDate) : "",
+        "Intended End (BS)": contract.intendedCompletionDate ? toNepaliDate(contract.intendedCompletionDate) : "",
+        "Actual End (BS)": contract.actualCompletionDate ? toNepaliDate(contract.actualCompletionDate) : "",
+        "Site Incharge": contract.siteIncharge?.name ?? contract.project?.siteIncharge?.name ?? "",
+        Agreement: contract.agreement ? "Yes" : "No",
+        "Work Order": contract.workOrder ? "Yes" : "No",
+        "Completion Code": contract.completionCode ?? "",
+      })),
+    );
+  };
+
   const handleDeleteConfirm = async () => {
     if (!contractToDelete) return;
 
@@ -618,6 +649,17 @@ function ContractLandingContent() {
               and user views in sync.
             </p>
           </div>
+          <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleDownloadReport}
+            disabled={isLoading || isFetching || isError || filteredContracts.length === 0}
+            title="Download contracts matching the selected fiscal year, search, implementor, and milestone"
+            className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Download Report (CSV)
+          </button>
           <button
             type="button"
             onClick={() => router.push("/dashboard/contracts/new")}
@@ -626,6 +668,7 @@ function ContractLandingContent() {
             <Plus className="h-4 w-4" />
             New Contract
           </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
