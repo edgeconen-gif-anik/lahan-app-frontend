@@ -47,6 +47,7 @@ import {
   validateCommitteeOfficials,
 } from "@/lib/validation/user-committee";
 import { cn } from "@/lib/utils";
+import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
 
 type TouchedFieldMap = Partial<Record<keyof CommitteeFormState, boolean>>;
 type OfficialTouchedMap = Record<
@@ -474,19 +475,18 @@ function EditCommitteeForm({ committee, id }: EditCommitteeFormProps) {
                   error={getFieldError("formedDate")}
                   icon={<CalendarDays className="h-4 w-4" />}
                 >
-                  <Input
+                  <NepaliDatePicker
                     id="formedDate"
-                    type="date"
+                    valueType="ad"
                     value={formData.formedDate}
                     onBlur={() => markFieldTouched("formedDate")}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setFormData((current) => ({
                         ...current,
-                        formedDate: event.target.value,
+                        formedDate: value,
                       }))
                     }
-                    aria-invalid={Boolean(getFieldError("formedDate"))}
-                    className="h-10"
+                    invalid={Boolean(getFieldError("formedDate"))}
                   />
                 </FieldShell>
 

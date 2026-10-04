@@ -39,6 +39,7 @@ import {
 } from "@/lib/contract-documents";
 import { cn } from "@/lib/utils";
 import { useSystemSetup } from "@/hooks/setup/useSetup";
+import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
 
 type ContractNoMode = "sequential" | "uuid" | "manual";
 type DocumentContentMode = "auto" | "manual";
@@ -610,36 +611,20 @@ function BsDateInput({
   required,
   value,
 }: BsDateInputProps) {
-  const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const formattedValue = formatBsDateInput(event.target.value);
-
-    if (formattedValue !== event.target.value) {
-      event.target.value = formattedValue;
-      event.currentTarget.value = formattedValue;
-    }
-
-    onChange(event);
-  };
-
   return (
-    <div className="relative">
-      <input
-        type="text"
-        name={name}
-        value={value}
-        inputMode="numeric"
-        maxLength={10}
-        onBlur={onBlur}
-        onChange={handleDateChange}
-        required={required}
-        placeholder={placeholder}
-        pattern="\d{4}-\d{2}-\d{2}"
-        className={getInputClassName(Boolean(error), "h-11 pl-3 pr-14 py-2")}
-      />
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-border/70 bg-muted/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        BS
-      </span>
-    </div>
+    <NepaliDatePicker
+      name={name}
+      value={value}
+      onBlur={onBlur}
+      onValueChange={(nextValue) =>
+        onChange({
+          target: { name, type: "text", value: nextValue },
+        } as React.ChangeEvent<HTMLInputElement>)
+      }
+      placeholder={placeholder}
+      required={required}
+      invalid={Boolean(error)}
+    />
   );
 }
 

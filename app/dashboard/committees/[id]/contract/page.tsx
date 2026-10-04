@@ -8,6 +8,7 @@ import { useUserCommittees } from "@/hooks/user-committee/useUserCommittees";
 import { useSystemSetup } from "@/hooks/setup/useSetup";
 import { ChevronLeft, Calculator } from "lucide-react";
 import Link from "next/link";
+import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
 
 type CommitteeContractFormData = {
   projectId: string;
@@ -230,22 +231,26 @@ export default function CommitteeContractPage() {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Start Date</label>
-            <input
+            <NepaliDatePicker
               name="startDate"
-              type="date"
+              valueType="ad"
               required
-              className="w-full p-2 border rounded-md"
-              onChange={handleChange}
+              value={formData.startDate}
+              onValueChange={(value) =>
+                setFormData((current) => ({ ...current, startDate: value }))
+              }
             />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">End Date</label>
-            <input
+            <NepaliDatePicker
               name="endDate"
-              type="date"
+              valueType="ad"
               required
-              className="w-full p-2 border rounded-md"
-              onChange={handleChange}
+              value={formData.endDate}
+              onValueChange={(value) =>
+                setFormData((current) => ({ ...current, endDate: value }))
+              }
             />
           </div>
         </div>

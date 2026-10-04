@@ -255,6 +255,7 @@ function ContractRow({
   onDelete: () => void;
   onStatusChange: (status: ContractStatus) => void;
 }) {
+  const router = useRouter();
   const canChangeStatus = isAdmin && contract.approvalStatus === "APPROVED";
   const statusBlockReason = canChangeStatus
     ? getNextStatusBlockReason(contract)
@@ -275,13 +276,26 @@ function ContractRow({
   const siteIncharge =
     contract.siteIncharge ?? contract.project?.siteIncharge ?? null;
 
+  const detailHref = `/dashboard/contracts/${contract.id}`;
+  const handleRowClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("a, button, select, input, textarea, label")) return;
+    router.push(detailHref);
+  };
+
   return (
-    <tr className="border-b align-top">
+    <tr
+      className="cursor-pointer border-b align-top transition-colors hover:bg-muted/30"
+      onClick={handleRowClick}
+    >
       <td className="px-4 py-4">
         <div className="space-y-2">
-          <div className="font-mono text-sm font-semibold text-primary">
+          <Link
+            href={detailHref}
+            className="block font-mono text-sm font-semibold text-primary hover:underline"
+          >
             {contract.contractNumber}
-          </div>
+          </Link>
           <div className="flex flex-wrap gap-2">
             {contract.agreement && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700">

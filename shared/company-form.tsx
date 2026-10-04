@@ -22,6 +22,7 @@ import { toFormalNepaliDate } from "@/lib/date-utils";
 import { sanitizeTenDigitPhone, TEN_DIGIT_PHONE_LENGTH } from "@/lib/validation/phone";
 import { useSystemSetup } from "@/hooks/setup/useSetup";
 import { formatFiscalYearForDisplay } from "@/lib/fiscal-year";
+import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
 
 interface CompanyFormProps {
   defaultValues?: Partial<CompanyFormValues>;
@@ -111,10 +112,9 @@ export function CompanyForm({
   };
 
   const handleDateChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
+    val: string,
     onChange: (value: Date | undefined) => void
   ) => {
-    const val = e.target.value;
     if (!val) {
       onChange(undefined);
       return;
@@ -291,12 +291,12 @@ export function CompanyForm({
               name="registrationRequestDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Request Date (A.D.) <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>Request Date (B.S.) <span className="text-red-500">*</span></FormLabel>
                   <FormControl>
-                    <Input
-                      type="date"
+                    <NepaliDatePicker
+                      valueType="ad"
                       value={formatDateForInput(field.value)}
-                      onChange={(e) => handleDateChange(e, field.onChange)}
+                      onValueChange={(v) => handleDateChange(v, field.onChange)}
                     />
                   </FormControl>
                   <div className="h-6 mt-1">
@@ -318,12 +318,12 @@ export function CompanyForm({
               name="registrationDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Registration Approval Date (A.D.)</FormLabel>
+                  <FormLabel>Registration Approval Date (B.S.)</FormLabel>
                   <FormControl>
-                    <Input
-                      type="date"
+                    <NepaliDatePicker
+                      valueType="ad"
                       value={formatDateForInput(field.value)}
-                      onChange={(e) => handleDateChange(e, field.onChange)}
+                      onValueChange={(v) => handleDateChange(v, field.onChange)}
                     />
                   </FormControl>
                   <div className="h-6 mt-1">

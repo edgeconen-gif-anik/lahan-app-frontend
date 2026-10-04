@@ -10,6 +10,7 @@ import { useUserCommittees } from "@/hooks/user-committee/useUserCommittees";
 import { useUsers } from "@/hooks/user/useUsers";
 import { toAdDate, toNepaliDate } from "@/lib/date-utils";
 import type { UpdateContractPayload } from "@/lib/schema/contract/contract";
+import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
 
 type MutationError = {
   response?: {
@@ -299,15 +300,12 @@ function BsDateInput({
   onChange: (name: keyof EditFormState, value: string) => void;
 }) {
   return (
-    <input
-      type="text"
-      inputMode="numeric"
+    <NepaliDatePicker
       name={name}
-      required={required}
       value={value}
-      onChange={(event) => onChange(name, formatBsDateInput(event.target.value))}
+      onValueChange={(nextValue) => onChange(name, nextValue)}
       placeholder="2082-01-15"
-      className="w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
+      required={required}
     />
   );
 }

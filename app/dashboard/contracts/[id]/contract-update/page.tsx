@@ -17,6 +17,7 @@ import {
 import { CONTRACT_STATUS_LABEL } from "@/components/contract-status-badge";
 import { toNepaliDate } from "@/lib/date-utils";
 import type { Contract } from "@/lib/schema/contract/contract";
+import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
 
 type CompletionDraft = {
   contractId: string;
@@ -310,14 +311,13 @@ export default function ContractUpdatePage() {
               <span className="text-sm font-medium text-foreground">
                 Actual Completion Date
               </span>
-              <input
-                type="date"
+              <NepaliDatePicker
+                valueType="ad"
                 value={actualCompletionDate}
-                onChange={(event) =>
-                  updateDraft({ actualCompletionDate: event.target.value })
+                onValueChange={(value) =>
+                  updateDraft({ actualCompletionDate: value })
                 }
                 disabled={isArchived || isSubmitting || !canEditCompletedContract}
-                className="w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
               />
               <span className="block text-xs text-muted-foreground">
                 {helperDateText}

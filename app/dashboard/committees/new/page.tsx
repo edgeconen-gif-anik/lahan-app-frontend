@@ -29,6 +29,7 @@ import {
   validateCommitteeOfficials,
 } from "@/lib/validation/user-committee";
 import { useSystemSetup } from "@/hooks/setup/useSetup";
+import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
 
 type TouchedFieldMap = Partial<Record<keyof CommitteeFormState | "bsDate", boolean>>;
 type OfficialTouchedMap = Record<
@@ -137,8 +138,8 @@ export default function RegisterCommitteePage() {
     }));
   };
 
-  const handleBsDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = formatBsDateInput(event.target.value);
+  const handleBsDateChange = (rawValue: string) => {
+    const value = formatBsDateInput(rawValue);
     setBsDate(value);
 
     const adDate = toAdDate(value);
@@ -274,13 +275,12 @@ export default function RegisterCommitteePage() {
 
             <div className="space-y-2">
               <Label htmlFor="formedDateBs">Formed Date (BS)</Label>
-              <Input
+              <NepaliDatePicker
                 id="formedDateBs"
                 value={bsDate}
                 onBlur={() => markFieldTouched("bsDate")}
-                onChange={handleBsDateChange}
-                placeholder="YYYY-MM-DD"
-                aria-invalid={Boolean(getFieldError("bsDate") || getFieldError("formedDate"))}
+                onValueChange={handleBsDateChange}
+                invalid={Boolean(getFieldError("bsDate") || getFieldError("formedDate"))}
               />
               {formData.formedDate ? (
                 <p className="text-xs text-muted-foreground">

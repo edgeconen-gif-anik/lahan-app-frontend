@@ -16,6 +16,7 @@ import type {
   FuelType,
 } from "@/lib/schema/fuel/fuel";
 import { FUEL_SOURCE_LABEL, FUEL_TYPE_LABEL } from "@/lib/schema/fuel/fuel";
+import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
 
 type FuelFormValues = {
   userId: string;
@@ -246,11 +247,10 @@ export function FuelForm({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Log Date</label>
-            <input
-              type="date"
+            <NepaliDatePicker
+              valueType="ad"
               value={form.logDate}
-              onChange={(event) => handleChange("logDate", event.target.value)}
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              onValueChange={(value) => handleChange("logDate", value)}
               required
             />
           </div>
@@ -261,7 +261,7 @@ export function FuelForm({
               type="search"
               value={searchProject}
               onChange={(event) => setSearchProject(event.target.value)}
-              placeholder="Search projects..."
+              placeholder="Search projects by name or S.No..."
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
             />
             <select
