@@ -366,7 +366,7 @@ export default function ProjectLandingPage() {
                     </td>
                     <td className="p-4 text-sm">{project.fiscalYear}</td>
                     <td className="p-4 text-sm">
-                      à¤°à¥‚ {project.allocatedBudget.toLocaleString()}
+                      Rs. {project.allocatedBudget.toLocaleString()}
                     </td>
                     <td className="p-4">
                       <span
