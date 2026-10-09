@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { companyService } from "@/services/company/company.service";
@@ -26,6 +31,17 @@ export const useCompanies = (params?: {
   return useQuery<Company[]>({
     queryKey: ["companies", params],
     queryFn: () => companyService.getAll(params),
+  });
+};
+
+/** Server-paged companies for the list page. */
+export const useCompaniesPage = (
+  params: Parameters<typeof companyService.getPage>[0],
+) => {
+  return useQuery({
+    queryKey: ["companies", "page", params],
+    queryFn: () => companyService.getPage(params),
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -102,6 +118,37 @@ export const useApproveCompany = () => {
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to approve company"));
+    },
+  });
+};
+
+/** Approves several companies in small batches and shows one summary toast. */
+export const useBulkApproveCompanies = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      let approved = 0;
+
+      for (let index = 0; index < ids.length; index += 5) {
+        const results = await Promise.allSettled(
+          ids.slice(index, index + 5).map((id) => companyService.approve(id)),
+        );
+        approved += results.filter((result) => result.status === "fulfilled").length;
+      }
+
+      return { approved, failed: ids.length - approved };
+    },
+    onSuccess: ({ approved, failed }) => {
+      if (failed === 0) {
+        toast.success(`${approved} compan${approved === 1 ? "y" : "ies"} approved`);
+      } else {
+        toast.warning(`${approved} approved, ${failed} could not be approved`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to approve companies"));
     },
   });
 };

@@ -33,6 +33,13 @@ export type UserCommitteeListParams = {
   limit?: number;
 };
 
+export type UserCommitteeCounts = {
+  total: number;
+  PENDING: number;
+  APPROVED: number;
+  REJECTED: number;
+};
+
 export type UserCommitteeListResponse = {
   data: UserCommitteeRecord[];
   meta: {
@@ -40,6 +47,8 @@ export type UserCommitteeListResponse = {
     page: number;
     lastPage: number;
   };
+  /** Present on responses from the paged endpoint. */
+  counts?: UserCommitteeCounts;
 };
 
 export type UserCommitteeMutationPayload = Record<string, unknown> & {
@@ -78,6 +87,7 @@ function normalizeUserCommitteeListResponse(
         page: response.meta?.page ?? params?.page ?? 1,
         lastPage: response.meta?.lastPage ?? 1,
       },
+      counts: response.counts,
     };
   }
 

@@ -1,62 +1,77 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
-import { useFiscalYearSelection } from "@/lib/fiscal-year-context";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRole } from "@/lib/auth/use-role";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import {
-  ArrowRight,
   Building2,
   CalendarClock,
   CheckCircle2,
   Download,
   Eye,
-  FileSignature,
+  FileSpreadsheet,
   FileText,
+  FileSignature,
+  Pencil,
   Plus,
-  Search,
   Trash2,
   User,
   Users,
 } from "lucide-react";
-import {
-  CONTRACT_KEYS,
-  useApproveContract,
-  useContracts,
-  useUpdateContractStatus,
-} from "@/hooks/contract/useContracts";
-import { contractService } from "@/services/contract/contractService";
-import type { Contract, ContractStatus } from "@/lib/schema/contract/contract";
-import { toast } from "sonner";
-import { getApiErrorMessage } from "@/lib/api-error";
+
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { EmptyState } from "@/components/empty-state";
-import { PageHeader } from "@/components/page-header";
-import { TableSkeleton } from "@/components/table-skeleton";
-import { Button } from "@/components/ui/button";
 import {
-  ContractStatusBadge,
   CONTRACT_STATUS_LABEL,
   CONTRACT_STATUS_ORDER,
+  ContractStatusBadge,
 } from "@/components/contract-status-badge";
+import { BulkActionBar } from "@/components/data/bulk-action-bar";
+import { DataTable, type DataTableColumn } from "@/components/data/data-table";
+import { FilterBar } from "@/components/data/filter-bar";
+import { FilterChips } from "@/components/data/filter-chips";
+import { Pagination } from "@/components/data/pagination";
+import { RowActions, type RowAction } from "@/components/data/row-actions";
+import { SearchInput } from "@/components/data/search-input";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge, type StatusTone } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  CONTRACT_KEYS,
+  useBulkApproveContracts,
+  useContractsPage,
+  useUpdateContractStatus,
+} from "@/hooks/contract/useContracts";
+import { getApiErrorMessage } from "@/lib/api-error";
+import { useRole } from "@/lib/auth/use-role";
 import { toNepaliDate } from "@/lib/date-utils";
-import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
-import { downloadCsv } from "@/lib/report-export";
+import { useEffectiveFiscalYear } from "@/lib/fiscal-year-context";
+import type { Contract, ContractStatus } from "@/lib/schema/contract/contract";
+import { downloadCsv, downloadXlsx, type CsvRow } from "@/lib/report-export";
+import { useUrlParams } from "@/lib/use-url-params";
+import { cn } from "@/lib/utils";
+import { contractService } from "@/services/contract/contractService";
 
-type ImplementationFilter = "ALL" | "COMPANY" | "USER_COMMITTEE";
-type StatusFilter = "ALL" | ContractStatus;
+type View = "all" | "pending" | "overdue";
+type Implementor = "ALL" | "COMPANY" | "USER_COMMITTEE";
 
-type TimeHealth =
-  "not_started" | "ongoing" | "overdue" | "completed" | "archived";
+const DEFAULT_LIMIT = 20;
 
 const ACTIVE_CONTRACT_STATUS_ORDER = CONTRACT_STATUS_ORDER.filter(
   (status) => status !== "ARCHIVED",
 );
 
-function isContractStatus(value: string | null): value is ContractStatus {
+function isContractStatus(value: string): value is ContractStatus {
   return CONTRACT_STATUS_ORDER.includes(value as ContractStatus);
 }
 
@@ -99,6 +114,9 @@ function getNextStatusBlockReason(contract: Contract) {
   return nextStatus ? getStatusChangeBlockReason(contract, nextStatus) : null;
 }
 
+type TimeHealth =
+  "not_started" | "ongoing" | "overdue" | "completed" | "archived";
+
 function getTimeHealth(
   contract: Pick<
     Contract,
@@ -120,57 +138,77 @@ function getTimeHealth(
   return "ongoing";
 }
 
+const TIME_HEALTH: Record<TimeHealth, { label: string; tone: StatusTone }> = {
+  not_started: { label: "Timeline not started", tone: "neutral" },
+  ongoing: { label: "On track", tone: "success" },
+  overdue: { label: "Overdue", tone: "danger" },
+  completed: { label: "Delivered", tone: "success" },
+  archived: { label: "Archived", tone: "neutral" },
+};
+
+function TimeHealthBadge({ contract }: { contract: Contract }) {
+  const health = TIME_HEALTH[getTimeHealth(contract)];
+
+  return (
+    <StatusBadge tone={health.tone} compact>
+      {health.label}
+    </StatusBadge>
+  );
+}
+
 function formatUserName(
   user?: { name?: string | null; email?: string | null } | null,
 ): string {
   return user?.name || user?.email || "Unknown user";
 }
 
-function TimeHealthBadge({ contract }: { contract: Contract }) {
-  const health = getTimeHealth(contract);
+function formatAmount(value: unknown) {
+  return `Rs. ${Number(value ?? 0).toLocaleString("en-IN")}`;
+}
 
-  const content: Record<TimeHealth, { label: string; className: string }> = {
-    not_started: {
-      label: "Timeline Not Started",
-      className: "bg-slate-100 text-slate-700",
-    },
-    ongoing: {
-      label: "On Track",
-      className: "bg-emerald-100 text-emerald-700",
-    },
-    overdue: {
-      label: "Overdue",
-      className: "bg-rose-100 text-rose-700",
-    },
-    completed: {
-      label: "Delivered",
-      className: "bg-green-100 text-green-700",
-    },
-    archived: {
-      label: "Archived",
-      className: "bg-zinc-100 text-zinc-700",
-    },
-  };
-
-  return (
-    <span
-      className={`inline-flex rounded-full px-2 py-1 text-[11px] font-medium ${content[health].className}`}
-    >
-      {content[health].label}
-    </span>
-  );
+function toReportRows(contracts: Contract[]): CsvRow[] {
+  return contracts.map((contract, index) => ({
+    "S.No": index + 1,
+    "Contract No.": contract.contractNumber,
+    "Fiscal Year": contract.fiscalYear ?? contract.project?.fiscalYear ?? "",
+    Project: contract.project?.name ?? "",
+    "Project S.No": contract.project?.sNo ?? "",
+    "Implementor Type": contract.company
+      ? "Company"
+      : contract.userCommittee
+        ? "User Committee"
+        : "",
+    Implementor: contract.company?.name ?? contract.userCommittee?.name ?? "",
+    Milestone: CONTRACT_STATUS_LABEL[contract.status],
+    Approval: contract.approvalStatus,
+    "Contract Amount (Rs.)": Number(contract.contractAmount),
+    "Final Evaluated Amount (Rs.)":
+      contract.finalEvaluatedAmount == null
+        ? ""
+        : Number(contract.finalEvaluatedAmount),
+    "Start Date (BS)": contract.startDate ? toNepaliDate(contract.startDate) : "",
+    "Intended End (BS)": contract.intendedCompletionDate
+      ? toNepaliDate(contract.intendedCompletionDate)
+      : "",
+    "Actual End (BS)": contract.actualCompletionDate
+      ? toNepaliDate(contract.actualCompletionDate)
+      : "",
+    "Site Incharge":
+      contract.siteIncharge?.name ?? contract.project?.siteIncharge?.name ?? "",
+    Agreement: contract.agreement ? "Yes" : "No",
+    "Work Order": contract.workOrder ? "Yes" : "No",
+    "Completion Code": contract.completionCode ?? "",
+  }));
 }
 
 function StatusCard({
   label,
   value,
-  accent,
   isActive,
   onClick,
 }: {
   label: string;
-  value: number;
-  accent?: string;
+  value: number | undefined;
   isActive: boolean;
   onClick: () => void;
 }) {
@@ -179,404 +217,219 @@ function StatusCard({
       type="button"
       onClick={onClick}
       aria-pressed={isActive}
-      className={`rounded-xl border bg-card px-4 py-3 text-left transition hover:border-primary/50 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        isActive ? "border-primary bg-primary/5 shadow-sm" : ""
-      }`}
+      className={cn(
+        "rounded-xl border bg-card px-4 py-3 text-left transition hover:border-primary/50 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        isActive && "border-primary bg-primary/5 shadow-sm",
+      )}
     >
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p
-        className={`mt-2 text-2xl font-bold ${isActive ? "text-primary" : (accent ?? "")}`}
-      >
-        {value}
+      <p className={cn("mt-2 text-2xl font-bold", isActive && "text-primary")}>
+        {value ?? <Skeleton className="mt-1 h-7 w-10" />}
       </p>
     </button>
   );
 }
 
-function ContractRow({
+function ImplementorCell({ contract }: { contract: Contract }) {
+  if (contract.company) {
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-tone-info-foreground" aria-hidden="true" />
+          <span className="font-medium">{contract.company.name}</span>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          PAN: {contract.company.panNumber ?? "-"}
+        </div>
+      </div>
+    );
+  }
+
+  if (contract.userCommittee) {
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-tone-warning-foreground" aria-hidden="true" />
+          <span className="font-medium">{contract.userCommittee.name}</span>
+        </div>
+        <div className="text-xs text-muted-foreground">User committee</div>
+      </div>
+    );
+  }
+
+  return <span className="text-muted-foreground">Not assigned</span>;
+}
+
+function MilestoneCell({
   contract,
   isAdmin,
-  isUpdatingStatus,
-  isApproving,
-  onApprove,
-  onDelete,
-  onStatusChange,
+  isUpdating,
+  onChange,
 }: {
   contract: Contract;
   isAdmin: boolean;
-  isUpdatingStatus: boolean;
-  isApproving: boolean;
-  onApprove: () => void;
-  onDelete: () => void;
-  onStatusChange: (status: ContractStatus) => void;
+  isUpdating: boolean;
+  onChange: (status: ContractStatus) => void;
 }) {
-  const router = useRouter();
   const canChangeStatus = isAdmin && contract.approvalStatus === "APPROVED";
-  const statusBlockReason = canChangeStatus
-    ? getNextStatusBlockReason(contract)
-    : null;
-  const implementor = contract.company
-    ? {
-        icon: <Building2 className="h-4 w-4 text-blue-500" />,
-        label: contract.company.name,
-        sublabel: `PAN: ${contract.company.panNumber ?? "-"}`,
-      }
-    : contract.userCommittee
-      ? {
-          icon: <Users className="h-4 w-4 text-amber-500" />,
-          label: contract.userCommittee.name,
-          sublabel: "User Committee",
-        }
-      : null;
-  const siteIncharge =
-    contract.siteIncharge ?? contract.project?.siteIncharge ?? null;
-
-  const detailHref = `/dashboard/contracts/${contract.id}`;
-  const handleRowClick = (event: React.MouseEvent<HTMLTableRowElement>) => {
-    const target = event.target as HTMLElement;
-    if (target.closest("a, button, select, input, textarea, label")) return;
-    router.push(detailHref);
-  };
+  const blockReason = canChangeStatus ? getNextStatusBlockReason(contract) : null;
 
   return (
-    <tr
-      className="cursor-pointer border-b align-top transition-colors hover:bg-muted/30"
-      onClick={handleRowClick}
-    >
-      <td className="px-4 py-4">
-        <div className="space-y-2">
-          <Link
-            href={detailHref}
-            className="block font-mono text-sm font-semibold text-primary hover:underline"
-          >
-            {contract.contractNumber}
-          </Link>
-          <div className="flex flex-wrap gap-2">
-            {contract.agreement && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700">
-                <FileText className="h-3 w-3" />
-                Agreement
-              </span>
-            )}
-            {contract.workOrder && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700">
-                <CalendarClock className="h-3 w-3" />
-                Work Order
-              </span>
-            )}
-          </div>
-        </div>
-      </td>
-
-      <td className="px-4 py-4">
-        <div className="space-y-1">
-          <div className="font-medium">
-            {contract.project?.name ?? "Unlinked Project"}
-          </div>
-          {contract.project?.sNo && (
-            <div className="text-xs text-muted-foreground">
-              S.No: {contract.project.sNo}
-            </div>
-          )}
-          {siteIncharge && (
-            <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <User className="h-3 w-3" />
-              <span>
-                Site Incharge:{" "}
-                <span className="font-medium text-foreground">
-                  {siteIncharge.name}
-                </span>
-                {siteIncharge.designation ? (
-                  <span className="text-muted-foreground">
-                    {" "}
-                    ({siteIncharge.designation})
-                  </span>
-                ) : null}
-              </span>
-            </div>
-          )}
-        </div>
-      </td>
-
-      <td className="px-4 py-4">
-        {implementor ? (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              {implementor.icon}
-              <span className="font-medium">{implementor.label}</span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {implementor.sublabel}
-            </div>
-          </div>
-        ) : (
-          <span className="text-sm text-muted-foreground">Not assigned</span>
-        )}
-      </td>
-
-      <td className="px-4 py-4">
-        <div className="space-y-2">
-          {canChangeStatus ? (
-            <select
-              value={contract.status}
-              disabled={isUpdatingStatus}
-              onChange={(event) =>
-                onStatusChange(event.target.value as ContractStatus)
-              }
-              className="h-9 rounded-md border bg-background px-3 text-sm"
+    <div className="space-y-2">
+      {canChangeStatus ? (
+        <select
+          value={contract.status}
+          disabled={isUpdating}
+          aria-label={`Milestone for ${contract.contractNumber}`}
+          onChange={(event) => onChange(event.target.value as ContractStatus)}
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+        >
+          {CONTRACT_STATUS_ORDER.map((status) => (
+            <option
+              key={status}
+              value={status}
+              disabled={Boolean(getStatusChangeBlockReason(contract, status))}
             >
-              {CONTRACT_STATUS_ORDER.map((status) => {
-                const blockReason = getStatusChangeBlockReason(
-                  contract,
-                  status,
-                );
-
-                return (
-                  <option
-                    key={status}
-                    value={status}
-                    disabled={Boolean(blockReason)}
-                  >
-                    {CONTRACT_STATUS_LABEL[status]}
-                  </option>
-                );
-              })}
-            </select>
-          ) : (
-            <ContractStatusBadge status={contract.status} />
-          )}
-          {statusBlockReason && (
-            <p className="max-w-56 text-xs leading-5 text-muted-foreground">
-              {statusBlockReason}
-            </p>
-          )}
-          {!canChangeStatus &&
-            isAdmin &&
-            contract.approvalStatus !== "APPROVED" && (
-              <p className="text-xs text-muted-foreground">
-                Approve first to change milestone.
-              </p>
-            )}
-          <TimeHealthBadge contract={contract} />
-        </div>
-      </td>
-
-      <td className="px-4 py-4">
-        <div className="space-y-1.5">
-          <ApprovalStatusBadge status={contract.approvalStatus} />
-          {isAdmin && contract.approvalStatus !== "APPROVED" && (
-            <p className="max-w-48 text-xs leading-5 text-muted-foreground">
-              Submitted by{" "}
-              <span className="font-medium text-foreground">
-                {contract.initiatedBy
-                  ? formatUserName(contract.initiatedBy)
-                  : (contract.initiatedById ?? "unknown user")}
-              </span>
-            </p>
-          )}
-        </div>
-      </td>
-
-      <td className="px-4 py-4">
-        <div className="space-y-1 text-sm">
-          <div>
-            <span className="text-muted-foreground">Start:</span>{" "}
-            {toNepaliDate(contract.startDate) ?? "-"}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Intended End:</span>{" "}
-            {toNepaliDate(contract.intendedCompletionDate) ?? "-"}
-          </div>
-          <div className="font-medium">
-            Rs. {Number(contract.contractAmount ?? 0).toLocaleString()}
-          </div>
-        </div>
-      </td>
-
-      <td className="px-4 py-4">
-        <div className="flex items-center justify-end gap-2">
-          {isAdmin && contract.approvalStatus !== "APPROVED" && (
-            <button
-              type="button"
-              onClick={onApprove}
-              disabled={isApproving}
-              className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Approve
-            </button>
-          )}
-          <Link
-            href={`/dashboard/contracts/${contract.id}`}
-            className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
-          >
-            <Eye className="h-4 w-4" />
-            View
-          </Link>
-          <Link
-            href={`/dashboard/contracts/${contract.id}/edit`}
-            className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
-          >
-            <ArrowRight className="h-4 w-4" />
-            Edit
-          </Link>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
+              {CONTRACT_STATUS_LABEL[status]}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <ContractStatusBadge status={contract.status} />
+      )}
+      {blockReason ? (
+        <p className="max-w-56 text-xs leading-5 text-muted-foreground">
+          {blockReason}
+        </p>
+      ) : null}
+      {isAdmin && contract.approvalStatus !== "APPROVED" ? (
+        <p className="text-xs text-muted-foreground">
+          Approve first to change milestone.
+        </p>
+      ) : null}
+      <TimeHealthBadge contract={contract} />
+    </div>
   );
 }
 
 function ContractsLoadingFallback() {
   return (
     <div className="space-y-6">
-      <div>
-        <div className="h-9 w-72 animate-pulse rounded-md bg-muted" />
-        <div className="mt-2 h-5 w-[32rem] max-w-full animate-pulse rounded-md bg-muted" />
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-4 w-96 max-w-full" />
       </div>
-      <div className="h-32 animate-pulse rounded-xl border bg-card" />
-      <div className="h-96 animate-pulse rounded-xl border bg-card" />
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-96 w-full" />
     </div>
   );
 }
 
 function ContractLandingContent() {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAdmin } = useRole();
-  const { data: setup } = useSystemSetup();
-  const { data: fiscalYears = [] } = useFiscalYears();
-  const [fiscalYearFilter, setFiscalYearFilter] = useFiscalYearSelection();
-  const effectiveFiscalYear =
-    fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
-  const { data: contracts = [], isLoading, isFetching, isError } = useContracts({
-    fiscalYear: effectiveFiscalYear || undefined,
-  });
-  const { mutate: approveContract, isPending: isApprovingContract } =
-    useApproveContract();
-  const { mutate: updateContractStatus, isPending: isUpdatingStatus } =
-    useUpdateContractStatus();
+  const fiscalYear = useEffectiveFiscalYear();
+  const { get, getInt, update, clear } = useUrlParams();
 
-  const [search, setSearch] = useState("");
-  const [implementationFilter, setImplementationFilter] =
-    useState<ImplementationFilter>("ALL");
-  const statusParam = searchParams.get("status");
-  const statusFilter: StatusFilter = isContractStatus(statusParam)
-    ? statusParam
-    : "ALL";
-  const [contractToDelete, setContractToDelete] = useState<Contract | null>(
-    null,
-  );
-  const [isDeleting, setIsDeleting] = useState(false);
+  // All list state lives in the URL, so refresh / Back / shared links work.
+  const search = get("q");
+  const statusParam = get("status");
+  const status = isContractStatus(statusParam) ? statusParam : undefined;
+  const viewParam = get("view");
+  const view: View =
+    viewParam === "pending" || viewParam === "overdue" ? viewParam : "all";
+  const implParam = get("impl");
+  const implementor: Implementor =
+    implParam === "COMPANY" || implParam === "USER_COMMITTEE" ? implParam : "ALL";
+  const sortBy = get("sort", "createdAt");
+  const sortOrder = get("order") === "asc" ? "asc" : "desc";
+  const page = getInt("page", 1);
+  const limit = getInt("limit", DEFAULT_LIMIT);
 
-  const setStatusFilter = (nextStatus: StatusFilter) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (nextStatus === "ALL") {
-      params.delete("status");
-    } else {
-      params.set("status", nextStatus);
-    }
-
-    const queryString = params.toString();
-    router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
-      scroll: false,
-    });
+  const filters = {
+    fiscalYear: fiscalYear || undefined,
+    search: search || undefined,
+    status,
+    implementor: implementor === "ALL" ? undefined : implementor,
+    approvalStatus: view === "pending" ? ("PENDING" as const) : undefined,
+    overdue: view === "overdue" ? true : undefined,
   };
 
-  const baseFilteredContracts = useMemo(() => {
-    return contracts.filter((contract) => {
-      const implementorName =
-        contract.company?.name ?? contract.userCommittee?.name ?? "";
-      const matchesSearch =
-        !search ||
-        contract.contractNumber.toLowerCase().includes(search.toLowerCase()) ||
-        (contract.project?.name ?? "")
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        implementorName.toLowerCase().includes(search.toLowerCase());
+  const { data, isLoading, isFetching, isError, refetch } = useContractsPage({
+    ...filters,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+  });
+  const contracts = data?.data ?? [];
+  const counts = data?.counts;
+  const meta = data?.meta;
 
-      const matchesImplementation =
-        implementationFilter === "ALL" ||
-        (implementationFilter === "COMPANY" && Boolean(contract.company)) ||
-        (implementationFilter === "USER_COMMITTEE" &&
-          Boolean(contract.userCommittee));
+  const { mutate: updateContractStatus, isPending: isUpdatingStatus } =
+    useUpdateContractStatus();
+  const { mutate: bulkApprove, isPending: isBulkApproving } =
+    useBulkApproveContracts();
 
-      return matchesSearch && matchesImplementation;
-    });
-  }, [contracts, implementationFilter, search]);
+  const [contractToDelete, setContractToDelete] = useState<Contract | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const filteredContracts = useMemo(() => {
-    return baseFilteredContracts.filter((contract) => {
-      return statusFilter === "ALL" || contract.status === statusFilter;
-    });
-  }, [baseFilteredContracts, statusFilter]);
-
-  const totalsByStatus = useMemo(
-    () =>
-      CONTRACT_STATUS_ORDER.reduce<Record<ContractStatus, number>>(
-        (acc, status) => {
-          acc[status] = baseFilteredContracts.filter(
-            (contract) => contract.status === status,
-          ).length;
-          return acc;
-        },
-        {
-          NOT_STARTED: 0,
-          AGREEMENT: 0,
-          WORKORDER: 0,
-          WORKINPROGRESS: 0,
-          COMPLETED: 0,
-          ARCHIVED: 0,
-        },
-      ),
-    [baseFilteredContracts],
+  // Selection belongs to the page it was made on: any filter, sort or page
+  // change drops it, so "N selected" never refers to rows you can't see.
+  const scopeKey = JSON.stringify([filters, page, limit, sortBy, sortOrder]);
+  const [selection, setSelection] = useState<{ scope: string; ids: Set<string> }>({
+    scope: scopeKey,
+    ids: new Set(),
+  });
+  const selectedIds = selection.scope === scopeKey ? selection.ids : new Set<string>();
+  const selectedContracts = contracts.filter((contract) => selectedIds.has(contract.id));
+  const selectedPending = selectedContracts.filter(
+    (contract) => contract.approvalStatus !== "APPROVED",
   );
 
-  const pendingApprovals = contracts.filter(
-    (contract) => contract.approvalStatus === "PENDING",
-  ).length;
+  const hasActiveFilters = Boolean(
+    search || status || implementor !== "ALL" || view !== "all",
+  );
 
-  const handleDownloadReport = () => {
-    const scope = effectiveFiscalYear && effectiveFiscalYear !== "all"
-      ? effectiveFiscalYear.replace(/[^\dA-Za-z-]/g, "-")
-      : "all-years";
-    downloadCsv(
-      `contract-report-${scope}-${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" })}.csv`,
-      filteredContracts.map((contract, index) => ({
-        "S.No": index + 1,
-        "Contract No.": contract.contractNumber,
-        "Fiscal Year": contract.fiscalYear ?? contract.project?.fiscalYear ?? "",
-        Project: contract.project?.name ?? "",
-        "Project S.No": contract.project?.sNo ?? "",
-        "Implementor Type": contract.company ? "Company" : contract.userCommittee ? "User Committee" : "",
-        Implementor: contract.company?.name ?? contract.userCommittee?.name ?? "",
-        Milestone: CONTRACT_STATUS_LABEL[contract.status],
-        Approval: contract.approvalStatus,
-        "Contract Amount (Rs.)": Number(contract.contractAmount),
-        "Final Evaluated Amount (Rs.)": contract.finalEvaluatedAmount == null ? "" : Number(contract.finalEvaluatedAmount),
-        "Start Date (BS)": contract.startDate ? toNepaliDate(contract.startDate) : "",
-        "Intended End (BS)": contract.intendedCompletionDate ? toNepaliDate(contract.intendedCompletionDate) : "",
-        "Actual End (BS)": contract.actualCompletionDate ? toNepaliDate(contract.actualCompletionDate) : "",
-        "Site Incharge": contract.siteIncharge?.name ?? contract.project?.siteIncharge?.name ?? "",
-        Agreement: contract.agreement ? "Yes" : "No",
-        "Work Order": contract.workOrder ? "Yes" : "No",
-        "Completion Code": contract.completionCode ?? "",
-      })),
+  const handleSort = (key: string) => {
+    update(
+      sortBy === key
+        ? { sort: key, order: sortOrder === "asc" ? "desc" : "asc" }
+        : { sort: key, order: key === "contractNumber" ? "asc" : "desc" },
     );
+  };
+
+  const exportFileName = (extension: string) => {
+    const scope =
+      fiscalYear && fiscalYear !== "all"
+        ? fiscalYear.replace(/[^\dA-Za-z-]/g, "-")
+        : "all-years";
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Kathmandu",
+    });
+    return `contract-report-${scope}-${today}.${extension}`;
+  };
+
+  const runExport = async (format: "csv" | "xlsx", only?: Contract[]) => {
+    try {
+      // Exports cover every match, not just the page on screen.
+      const rows = toReportRows(only ?? (await contractService.getAll(filters)));
+      if (rows.length === 0) {
+        toast.info("Nothing to export for the current filters.");
+        return;
+      }
+
+      if (format === "csv") {
+        downloadCsv(exportFileName("csv"), rows);
+      } else {
+        await downloadXlsx(exportFileName("xlsx"), rows, "Contracts");
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Could not prepare the export."));
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -587,12 +440,206 @@ function ContractLandingContent() {
       await contractService.delete(contractToDelete.id);
       await queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() });
       setContractToDelete(null);
+      toast.success("Contract deleted");
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to delete contract. Please try again."));
+      toast.error(
+        getApiErrorMessage(error, "Failed to delete contract. Please try again."),
+      );
     } finally {
       setIsDeleting(false);
     }
   };
+
+  const approveOne = (contract: Contract) => bulkApprove([contract.id]);
+
+  const buildActions = (contract: Contract): RowAction[] => [
+    { label: "View", icon: Eye, href: `/dashboard/contracts/${contract.id}` },
+    { label: "Edit", icon: Pencil, href: `/dashboard/contracts/${contract.id}/edit` },
+    {
+      label: "Approve",
+      icon: CheckCircle2,
+      onSelect: () => approveOne(contract),
+      hidden: !isAdmin || contract.approvalStatus === "APPROVED",
+      disabled: isBulkApproving,
+    },
+    {
+      label: "Delete",
+      icon: Trash2,
+      onSelect: () => setContractToDelete(contract),
+      destructive: true,
+      hidden: !isAdmin,
+    },
+  ];
+
+  const columns: DataTableColumn<Contract>[] = [
+    {
+      id: "contract",
+      header: "Contract",
+      sortKey: "contractNumber",
+      cell: (contract) => (
+        <div className="space-y-2">
+          <Link
+            href={`/dashboard/contracts/${contract.id}`}
+            className="block font-mono text-sm font-semibold text-primary hover:underline"
+          >
+            {contract.contractNumber}
+          </Link>
+          <div className="flex flex-wrap gap-1.5">
+            {contract.agreement ? (
+              <StatusBadge tone="info" icon={FileText} compact>
+                Agreement
+              </StatusBadge>
+            ) : null}
+            {contract.workOrder ? (
+              <StatusBadge tone="accent" icon={CalendarClock} compact>
+                Work order
+              </StatusBadge>
+            ) : null}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "project",
+      header: "Project",
+      cell: (contract) => {
+        const siteIncharge = contract.siteIncharge ?? contract.project?.siteIncharge;
+
+        return (
+          <div className="space-y-1">
+            <div className="font-medium">
+              {contract.project?.name ?? "Unlinked project"}
+            </div>
+            {contract.project?.sNo ? (
+              <div className="text-xs text-muted-foreground">
+                S.No: {contract.project.sNo}
+              </div>
+            ) : null}
+            {siteIncharge ? (
+              <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <User className="h-3 w-3" aria-hidden="true" />
+                <span>
+                  Site incharge:{" "}
+                  <span className="font-medium text-foreground">
+                    {siteIncharge.name}
+                  </span>
+                  {siteIncharge.designation ? ` (${siteIncharge.designation})` : ""}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      id: "implementor",
+      header: "Implementor",
+      cell: (contract) => <ImplementorCell contract={contract} />,
+    },
+    {
+      id: "milestone",
+      header: "Milestone",
+      cell: (contract) => (
+        <MilestoneCell
+          contract={contract}
+          isAdmin={isAdmin}
+          isUpdating={isUpdatingStatus}
+          onChange={(next) =>
+            updateContractStatus({ id: contract.id, status: next })
+          }
+        />
+      ),
+    },
+    {
+      id: "approval",
+      header: "Approval",
+      cell: (contract) => (
+        <div className="space-y-1.5">
+          <ApprovalStatusBadge status={contract.approvalStatus} />
+          {isAdmin && contract.approvalStatus !== "APPROVED" ? (
+            <p className="max-w-48 text-xs leading-5 text-muted-foreground">
+              Submitted by{" "}
+              <span className="font-medium text-foreground">
+                {contract.initiatedBy
+                  ? formatUserName(contract.initiatedBy)
+                  : (contract.initiatedById ?? "unknown user")}
+              </span>
+            </p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: "timeline",
+      header: "Timeline",
+      sortKey: "startDate",
+      cell: (contract) => (
+        <div className="space-y-1 text-sm">
+          <div>
+            <span className="text-muted-foreground">Start:</span>{" "}
+            {toNepaliDate(contract.startDate) ?? "-"}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Intended end:</span>{" "}
+            {toNepaliDate(contract.intendedCompletionDate) ?? "-"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "amount",
+      header: "Amount",
+      sortKey: "contractAmount",
+      align: "right",
+      cell: (contract) => (
+        <span className="whitespace-nowrap font-medium">
+          {formatAmount(contract.contractAmount)}
+        </span>
+      ),
+    },
+  ];
+
+  const renderMobileCard = (contract: Contract) => (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Link
+            href={`/dashboard/contracts/${contract.id}`}
+            className="font-mono text-sm font-semibold text-primary hover:underline"
+          >
+            {contract.contractNumber}
+          </Link>
+          <p className="mt-1 wrap-break-word font-medium">
+            {contract.project?.name ?? "Unlinked project"}
+          </p>
+        </div>
+        <RowActions actions={buildActions(contract)} label={contract.contractNumber} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <ContractStatusBadge status={contract.status} />
+        <ApprovalStatusBadge status={contract.approvalStatus} />
+        <TimeHealthBadge contract={contract} />
+      </div>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+        <dt className="text-muted-foreground">Implementor</dt>
+        <dd className="text-right">
+          {contract.company?.name ?? contract.userCommittee?.name ?? "Not assigned"}
+        </dd>
+        <dt className="text-muted-foreground">Amount</dt>
+        <dd className="text-right font-medium">{formatAmount(contract.contractAmount)}</dd>
+        <dt className="text-muted-foreground">Intended end</dt>
+        <dd className="text-right">{toNepaliDate(contract.intendedCompletionDate) ?? "-"}</dd>
+      </dl>
+    </div>
+  );
+
+  const statusCardItems: { label: string; value?: ContractStatus }[] = [
+    { label: "Total" },
+    ...CONTRACT_STATUS_ORDER.map((value) => ({
+      label: CONTRACT_STATUS_LABEL[value],
+      value,
+    })),
+  ];
 
   return (
     <>
@@ -616,22 +663,30 @@ function ContractLandingContent() {
         onConfirm={handleDeleteConfirm}
       />
 
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         <PageHeader
           title="Contracts"
           description="Track every contract from agreement to completion, in sync with its project, company and committee."
           actions={
             <>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleDownloadReport}
-                disabled={isLoading || isFetching || isError || filteredContracts.length === 0}
-                title="Download contracts matching the selected fiscal year, search, implementor, and milestone"
-              >
-                <Download />
-                Download Report (CSV)
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" disabled={isError || (meta?.total ?? 0) === 0}>
+                    <Download />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => void runExport("xlsx")}>
+                    <FileSpreadsheet />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void runExport("csv")}>
+                    <FileText />
+                    CSV
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button type="button" onClick={() => router.push("/dashboard/contracts/new")}>
                 <Plus />
                 New Contract
@@ -640,165 +695,185 @@ function ContractLandingContent() {
           }
         />
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
-          <StatusCard
-            label="Total"
-            value={baseFilteredContracts.length}
-            isActive={statusFilter === "ALL"}
-            onClick={() => setStatusFilter("ALL")}
-          />
-          {CONTRACT_STATUS_ORDER.map((status) => (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+          {statusCardItems.map((item) => (
             <StatusCard
-              key={status}
-              label={CONTRACT_STATUS_LABEL[status]}
-              value={totalsByStatus[status]}
-              isActive={statusFilter === status}
-              onClick={() => setStatusFilter(status)}
+              key={item.label}
+              label={item.label}
+              value={
+                item.value ? counts?.byStatus[item.value] : counts?.total
+              }
+              isActive={(status ?? undefined) === item.value}
+              onClick={() => update({ status: item.value ?? null })}
             />
           ))}
         </div>
 
-        {isAdmin && (
-          <div className="rounded-xl border bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Pending approvals:{" "}
-            <span className="font-semibold">{pendingApprovals}</span>
+        <FilterChips
+          label="Quick views"
+          value={view}
+          onChange={(next) => update({ view: next === "all" ? null : next })}
+          options={[
+            { value: "all", label: "All contracts" },
+            ...(isAdmin
+              ? [
+                  {
+                    value: "pending",
+                    label: "Needs approval",
+                    count: counts?.pendingApprovals,
+                    tone: "warning" as const,
+                  },
+                ]
+              : []),
+            {
+              value: "overdue",
+              label: "Overdue",
+              count: counts?.overdue,
+              tone: "warning" as const,
+            },
+          ]}
+        />
+
+        <FilterBar
+          hasActiveFilters={hasActiveFilters}
+          onReset={() => clear(["q", "status", "view", "impl"])}
+        >
+          <SearchInput
+            label="Search contracts"
+            placeholder="Contract no., project, company or committee"
+            value={search}
+            onChange={(value) => update({ q: value })}
+            className="w-full md:w-96"
+          />
+          <select
+            value={implementor}
+            onChange={(event) =>
+              update({ impl: event.target.value === "ALL" ? null : event.target.value })
+            }
+            aria-label="Implementor type"
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="ALL">All implementors</option>
+            <option value="COMPANY">Company</option>
+            <option value="USER_COMMITTEE">User committee</option>
+          </select>
+        </FilterBar>
+
+        {isError ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm">
+            <p className="font-medium text-destructive">Contracts could not be loaded.</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => void refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {isAdmin ? (
+              <BulkActionBar
+                count={selectedIds.size}
+                onClear={() => setSelection({ scope: scopeKey, ids: new Set() })}
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={selectedPending.length === 0 || isBulkApproving}
+                  onClick={() => {
+                    bulkApprove(selectedPending.map((contract) => contract.id));
+                    setSelection({ scope: scopeKey, ids: new Set() });
+                  }}
+                >
+                  <CheckCircle2 />
+                  Approve{selectedPending.length > 0 ? ` (${selectedPending.length})` : ""}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void runExport("xlsx", selectedContracts)}
+                >
+                  <FileSpreadsheet />
+                  Export selected
+                </Button>
+              </BulkActionBar>
+            ) : null}
+
+            <div
+              className={cn(
+                "overflow-hidden rounded-xl border shadow-sm transition-opacity",
+                isFetching && !isLoading && "opacity-70",
+              )}
+            >
+              <DataTable
+                columns={columns}
+                rows={contracts}
+                getRowId={(contract) => contract.id}
+                isLoading={isLoading}
+                minWidth={1100}
+                sort={{ key: sortBy, order: sortOrder }}
+                onSortChange={handleSort}
+                onRowClick={(contract) =>
+                  router.push(`/dashboard/contracts/${contract.id}`)
+                }
+                renderMobileCard={renderMobileCard}
+                rowActions={(contract) => (
+                  <RowActions
+                    actions={buildActions(contract)}
+                    label={contract.contractNumber}
+                  />
+                )}
+                selection={
+                  isAdmin
+                    ? {
+                        selectedIds,
+                        onChange: (ids) => setSelection({ scope: scopeKey, ids }),
+                      }
+                    : undefined
+                }
+                empty={
+                  <EmptyState
+                    icon={FileSignature}
+                    title={hasActiveFilters ? "No contracts match these filters" : "No contracts yet"}
+                    description={
+                      hasActiveFilters
+                        ? "Try clearing the search or choosing another fiscal year."
+                        : "Create the first contract for this fiscal year."
+                    }
+                    action={
+                      hasActiveFilters ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => clear(["q", "status", "view", "impl"])}
+                        >
+                          Reset filters
+                        </Button>
+                      ) : (
+                        <Button asChild size="sm">
+                          <Link href="/dashboard/contracts/new">
+                            <Plus />
+                            New Contract
+                          </Link>
+                        </Button>
+                      )
+                    }
+                  />
+                }
+              />
+              {meta ? (
+                <Pagination
+                  page={meta.page}
+                  lastPage={meta.lastPage}
+                  total={meta.total}
+                  limit={meta.limit}
+                  onPageChange={(next) => update({ page: next })}
+                  onLimitChange={(next) =>
+                    update({ limit: next === DEFAULT_LIMIT ? null : next })
+                  }
+                />
+              ) : null}
+            </div>
           </div>
         )}
-
-        <div className="grid gap-3 rounded-xl border bg-card p-4 lg:grid-cols-[minmax(0,1fr),180px,180px,180px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by contract no., project, company, or committee"
-              className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm"
-            />
-          </div>
-
-          <select
-            value={effectiveFiscalYear}
-            onChange={(event) => setFiscalYearFilter(event.target.value)}
-            className="h-10 rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="all">All Fiscal Years</option>
-            {fiscalYears.map((year) => (
-              <option key={year} value={year}>
-                {year}
-                {year === setup?.currentFiscalYear ? " (Current)" : ""}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={implementationFilter}
-            onChange={(event) =>
-              setImplementationFilter(
-                event.target.value as ImplementationFilter,
-              )
-            }
-            className="h-10 rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="ALL">All Implementors</option>
-            <option value="COMPANY">Company</option>
-            <option value="USER_COMMITTEE">User Committee</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as "ALL" | ContractStatus)
-            }
-            className="h-10 rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="ALL">All Milestones</option>
-            {CONTRACT_STATUS_ORDER.map((status) => (
-              <option key={status} value={status}>
-                {CONTRACT_STATUS_LABEL[status]}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1280px] text-left">
-              <thead className="bg-muted/40">
-                <tr>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Contract
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Project
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Implementor
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Milestone
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Visibility
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Timeline / Amount
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="p-0">
-                      <TableSkeleton rows={6} columns={6} />
-                    </td>
-                  </tr>
-                ) : filteredContracts.length === 0 ? (
-                  <tr>
-                    <td colSpan={7}>
-                      <EmptyState
-                        icon={FileSignature}
-                        title="No contracts found"
-                        description="Nothing matches the current filters. Try clearing the search or choosing another fiscal year."
-                        action={
-                          <Button asChild size="sm">
-                            <Link href="/dashboard/contracts/new">
-                              <Plus />
-                              New Contract
-                            </Link>
-                          </Button>
-                        }
-                      />
-                    </td>
-                  </tr>
-                ) : (
-                  filteredContracts.map((contract) => (
-                    <ContractRow
-                      key={contract.id}
-                      contract={contract}
-                      isAdmin={isAdmin}
-                      isUpdatingStatus={isUpdatingStatus}
-                      isApproving={isApprovingContract}
-                      onApprove={() => approveContract(contract.id)}
-                      onDelete={() => setContractToDelete(contract)}
-                      onStatusChange={(status) =>
-                        updateContractStatus({ id: contract.id, status })
-                      }
-                    />
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {!isLoading && filteredContracts.length > 0 && (
-            <div className="border-t bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-              Showing {filteredContracts.length} of {contracts.length} contracts
-            </div>
-          )}
-        </div>
       </div>
     </>
   );

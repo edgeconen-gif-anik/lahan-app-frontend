@@ -37,12 +37,14 @@ export function FiscalYearSwitcher() {
         size="sm"
         aria-label="Fiscal year"
         className={cn(
-          "hidden w-auto gap-2 sm:flex",
+          "w-auto gap-1.5 px-2 sm:gap-2 sm:px-3",
           isOtherYear && "border-amber-500/60 bg-tone-warning text-tone-warning-foreground",
         )}
       >
         <CalendarDays className="h-4 w-4" aria-hidden="true" />
-        <SelectValue />
+        <SelectValue>
+          {value === "all" ? "All years" : `FY ${value}`}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent align="end">
         <SelectItem value="all">All fiscal years</SelectItem>

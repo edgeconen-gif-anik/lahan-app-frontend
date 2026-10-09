@@ -1,8 +1,16 @@
 // hooks/contract/useContracts.ts
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { contractService } from "@/services/contract/contractService";
+import {
+  contractService,
+  type ContractPageParams,
+} from "@/services/contract/contractService";
 import { projectService } from "@/services/project/projectService";
 import type {
   Contract,
@@ -222,6 +230,15 @@ export const useContracts = (params?: ContractListParams) => {
   });
 };
 
+/** Server-paged contracts for the list page; keeps the old page while loading the next. */
+export const useContractsPage = (params: ContractPageParams) => {
+  return useQuery({
+    queryKey: [...CONTRACT_KEYS.lists(), "page", params] as const,
+    queryFn: () => contractService.getPage(params),
+    placeholderData: keepPreviousData,
+  });
+};
+
 export const useContract = (id: string) => {
   return useQuery({
     queryKey: CONTRACT_KEYS.detail(id),
@@ -419,6 +436,55 @@ export const useProjectUpdateContract = () => {
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to complete contract"));
+    },
+  });
+};
+
+/**
+ * Approves several contracts in small parallel batches and reports one summary
+ * toast (the single-approve hook would toast and refetch once per contract).
+ */
+export const useBulkApproveContracts = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      let approved = 0;
+
+      for (let index = 0; index < ids.length; index += 5) {
+        const batch = ids.slice(index, index + 5);
+        const results = await Promise.allSettled(
+          batch.map(async (id) => {
+            const contract = await contractService.approve(id);
+            try {
+              await syncProjectStatus(contract.projectId);
+            } catch (error) {
+              console.error("Failed to sync project status after approval:", error);
+            }
+          }),
+        );
+        approved += results.filter((result) => result.status === "fulfilled").length;
+      }
+
+      return { approved, failed: ids.length - approved };
+    },
+    onSuccess: async ({ approved, failed }) => {
+      if (failed === 0) {
+        toast.success(`${approved} contract${approved === 1 ? "" : "s"} approved`);
+      } else {
+        toast.warning(`${approved} approved, ${failed} could not be approved`);
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.details() }),
+        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
+      ]);
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to approve contracts"));
     },
   });
 };

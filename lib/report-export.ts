@@ -34,3 +34,59 @@ export function downloadCsv(filename: string, rows: CsvRow[]) {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+function saveBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads rows as an .xlsx workbook (bold header, sized columns, real
+ * numbers). The writer is loaded on demand so it never weighs down page loads.
+ */
+export async function downloadXlsx(
+  filename: string,
+  rows: CsvRow[],
+  sheetName = "Report",
+) {
+  if (typeof window === "undefined") return;
+
+  const { default: writeExcelFile } = await import(
+    "write-excel-file/universal"
+  );
+  const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+
+  const sheetData = [
+    headers.map((header) => ({ value: header, fontWeight: "bold" as const })),
+    ...rows.map((row) =>
+      headers.map((header) => {
+        const value = row[header];
+        if (value === null || value === undefined) return null;
+        if (typeof value === "number") return { value };
+        return { value: String(value) };
+      }),
+    ),
+  ];
+
+  const blob = await writeExcelFile(sheetData, {
+    sheet: sheetName.slice(0, 31),
+    columns: headers.map((header) => ({
+      width: Math.min(
+        40,
+        Math.max(
+          header.length + 2,
+          ...rows.map((row) => String(row[header] ?? "").length + 2),
+        ),
+      ),
+    })),
+  }).toBlob();
+
+  saveBlob(filename, blob);
+}

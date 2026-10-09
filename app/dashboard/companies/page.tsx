@@ -1,550 +1,565 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useFiscalYearSelection } from "@/lib/fiscal-year-context";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRole } from "@/lib/auth/use-role";
 import {
-  useCompanies,
-  useDeleteCompany,
-  useApproveCompany,
-} from "@/hooks/company/useCompany";
-import { useContracts } from "@/hooks/contract/useContracts";
-import {
-  CompanyCategoryEnum,
-  getCompanyIsContracted,
-} from "@/lib/schema/company.schema";
-import { isApprovedStatus } from "@/lib/schema/approval";
+  Building2,
+  CheckCircle2,
+  Download,
+  Eye,
+  FileBadge,
+  FileSpreadsheet,
+  FileText,
+  Pencil,
+  Phone,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { BulkActionBar } from "@/components/data/bulk-action-bar";
+import { DataTable, type DataTableColumn } from "@/components/data/data-table";
+import { FilterBar } from "@/components/data/filter-bar";
+import { FilterChips } from "@/components/data/filter-chips";
+import { Pagination } from "@/components/data/pagination";
+import { RowActions, type RowAction } from "@/components/data/row-actions";
+import { SearchInput } from "@/components/data/search-input";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { RegistrationInitiatorCell } from "@/components/registration-initiator-cell";
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
+import { StatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-import {
-  Plus,
-  MoreHorizontal,
-  FileBadge,
-  Pencil,
-  Phone,
-  Search,
-  Trash2,
-  Eye,
-  CheckCircle2,
-} from "lucide-react";
-
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
-import { ALL_FISCAL_YEARS } from "@/lib/fiscal-year";
-
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  useApproveCompany,
+  useBulkApproveCompanies,
+  useCompaniesPage,
+  useDeleteCompany,
+} from "@/hooks/company/useCompany";
+import { getApiErrorMessage } from "@/lib/api-error";
+import { useRole } from "@/lib/auth/use-role";
+import { useEffectiveFiscalYear } from "@/lib/fiscal-year-context";
+import { downloadCsv, downloadXlsx, type CsvRow } from "@/lib/report-export";
+import { CompanyCategoryEnum } from "@/lib/schema/company.schema";
+import { isApprovedStatus } from "@/lib/schema/approval";
+import { useUrlParams } from "@/lib/use-url-params";
+import { cn } from "@/lib/utils";
+import {
+  companyService,
+  type CompanyListItem,
+} from "@/services/company/company.service";
 
-export default function CompanyListPage() {
-  const { isAdmin } = useRole();
-  const { data: setup } = useSystemSetup();
-  const { data: fiscalYears = [] } = useFiscalYears();
-  const [fiscalYearFilter, setFiscalYearFilter] = useFiscalYearSelection();
-  const effectiveFiscalYear =
-    fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
-  const { data: companies = [], isLoading: isLoadingCompanies } = useCompanies({
-    fiscalYear: effectiveFiscalYear || undefined,
-  });
-  const { data: contracts = [], isLoading: isLoadingContracts } = useContracts({
-    fiscalYear: effectiveFiscalYear || undefined,
-  });
-  const { mutate: deleteCompany } = useDeleteCompany();
-  const { mutate: approveCompany, isPending: isApprovingCompany } =
-    useApproveCompany();
+type View = "all" | "pending" | "contracted" | "uncontracted";
 
-  const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [contractFilter, setContractFilter] = useState("ALL");
-  const [sortBy, setSortBy] = useState("date-desc");
+const DEFAULT_LIMIT = 20;
+const VIEWS: View[] = ["all", "pending", "contracted", "uncontracted"];
 
-  const [companyToDelete, setCompanyToDelete] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+function toReportRows(companies: CompanyListItem[]): CsvRow[] {
+  return companies.map((company, index) => ({
+    "S.No": index + 1,
+    Company: company.name,
+    PAN: company.panNumber,
+    "Fiscal Year": company.fiscalYear,
+    Category: company.category,
+    Approval: company.approvalStatus,
+    Contracted: company.isContracted || company.hasApprovedContract ? "Yes" : "No",
+    "Contact Person": company.contactPerson ?? "",
+    Phone: company.phoneNumber ?? "",
+    Email: company.email ?? "",
+    Address: company.address,
+  }));
+}
 
-  const contractCountsByCompany = useMemo(() => {
-    const counts = new Map<string, number>();
+/** Every company matching the filters, fetched page by page (for exports). */
+async function fetchAllCompanies(
+  filters: Omit<Parameters<typeof companyService.getPage>[0], "page">,
+  sortBy: string,
+  sortOrder: "asc" | "desc",
+) {
+  const all: CompanyListItem[] = [];
+  let page = 1;
+  let lastPage = 1;
 
-    contracts.forEach((contract) => {
-      if (!isApprovedStatus(contract.approvalStatus)) return;
-      if (!contract.companyId) return;
-      counts.set(contract.companyId, (counts.get(contract.companyId) ?? 0) + 1);
+  do {
+    const result = await companyService.getPage({
+      ...filters,
+      page,
+      limit: 100,
+      sortBy,
+      sortOrder,
     });
+    all.push(...result.data);
+    lastPage = result.meta.lastPage;
+    page += 1;
+  } while (page <= lastPage);
 
-    return counts;
-  }, [contracts]);
+  return all;
+}
 
-  const isLoading = isLoadingCompanies || isLoadingContracts;
-  const isCompanyContracted = (company: (typeof companies)[number]) =>
-    getCompanyIsContracted(
-      company,
-      contractCountsByCompany.get(company.id) ?? 0,
-    );
+function ContractedBadge({ company }: { company: CompanyListItem }) {
+  if (!isApprovedStatus(company.approvalStatus)) {
+    const label =
+      company.approvalStatus === "PENDING"
+        ? "Awaiting approval"
+        : "Not available for contracts";
+    return <Badge variant="outline">{label}</Badge>;
+  }
 
-  /* ------------------ Stats ------------------ */
+  return company.isContracted || company.hasApprovedContract ? (
+    <StatusBadge tone="success" compact>
+      Contracted
+    </StatusBadge>
+  ) : (
+    <StatusBadge tone="neutral" compact>
+      Not contracted
+    </StatusBadge>
+  );
+}
 
-  const totalCompanies = companies.length;
-  const pendingCompanies = companies.filter(
-    (company) => company.approvalStatus === "PENDING",
-  ).length;
+function CompaniesLoadingFallback() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
+}
 
-  const contractedCompanies = companies.filter(
-    (company) =>
-      isApprovedStatus(company.approvalStatus) && isCompanyContracted(company),
-  ).length;
+function CompanyListContent() {
+  const { isAdmin } = useRole();
+  const fiscalYear = useEffectiveFiscalYear();
+  const { get, getInt, update, clear } = useUrlParams();
 
-  const nonContractedCompanies = companies.filter(
-    (company) =>
-      isApprovedStatus(company.approvalStatus) && !isCompanyContracted(company),
-  ).length;
+  const search = get("q");
+  const category = get("category");
+  const viewParam = get("view") as View;
+  const view: View = VIEWS.includes(viewParam) ? viewParam : "all";
+  const sortBy = get("sort", "createdAt");
+  const sortOrder = get("order") === "asc" ? "asc" : "desc";
+  const page = getInt("page", 1);
+  const limit = getInt("limit", DEFAULT_LIMIT);
 
-  /* ------------------ Filter + Sort ------------------ */
-
-  const filteredCompanies = useMemo(() => {
-    return companies
-      .filter((company) => {
-        const matchesSearch =
-          company?.name?.toLowerCase().includes(search.toLowerCase()) ||
-          String(company?.panNumber || "").includes(search);
-
-        const matchesCategory =
-          categoryFilter === "ALL" || company.category === categoryFilter;
-
-        const matchesContract =
-          contractFilter === "ALL" ||
-          (contractFilter === "CONTRACTED" &&
-            getCompanyIsContracted(
-              company,
-              contractCountsByCompany.get(company.id) ?? 0,
-            )) ||
-          (contractFilter === "NON_CONTRACTED" &&
-            !getCompanyIsContracted(
-              company,
-              contractCountsByCompany.get(company.id) ?? 0,
-            ));
-
-        return matchesSearch && matchesCategory && matchesContract;
-      })
-      .sort((a, b) => {
-        if (sortBy === "name")
-          return (a.name || "").localeCompare(b.name || "");
-
-        const dateA = a.registrationRequestDate
-          ? new Date(a.registrationRequestDate).getTime()
-          : 0;
-
-        const dateB = b.registrationRequestDate
-          ? new Date(b.registrationRequestDate).getTime()
-          : 0;
-
-        if (sortBy === "date-desc") return dateB - dateA;
-        if (sortBy === "date-asc") return dateA - dateB;
-
-        return 0;
-      });
-  }, [
-    companies,
-    search,
-    categoryFilter,
-    contractFilter,
-    sortBy,
-    contractCountsByCompany,
-  ]);
-
-  const getAvailabilityBadgeLabel = (approvalStatus: string) => {
-    if (approvalStatus === "PENDING") return "Awaiting approval";
-    if (approvalStatus === "REJECTED") return "Not approved";
-    return "Not available for contracts";
+  const filters = {
+    fiscalYear: fiscalYear || undefined,
+    search: search || undefined,
+    category: category || undefined,
+    approvalStatus:
+      view === "pending"
+        ? ("PENDING" as const)
+        : view === "contracted" || view === "uncontracted"
+          ? ("APPROVED" as const)
+          : undefined,
+    contracted:
+      view === "contracted"
+        ? ("CONTRACTED" as const)
+        : view === "uncontracted"
+          ? ("NON_CONTRACTED" as const)
+          : undefined,
   };
+
+  const { data, isLoading, isFetching, isError, refetch } = useCompaniesPage({
+    ...filters,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+  });
+  const companies = data?.data ?? [];
+  const counts = data?.counts;
+  const meta = data?.meta;
+
+  const { mutate: approveCompany } = useApproveCompany();
+  const { mutate: bulkApprove, isPending: isBulkApproving } =
+    useBulkApproveCompanies();
+  const { mutate: deleteCompany, isPending: isDeleting } = useDeleteCompany();
+
+  const [companyToDelete, setCompanyToDelete] = useState<CompanyListItem | null>(null);
+
+  // Selection is tied to the current page/filters and drops on any change.
+  const scopeKey = JSON.stringify([filters, page, limit, sortBy, sortOrder]);
+  const [selection, setSelection] = useState<{ scope: string; ids: Set<string> }>({
+    scope: scopeKey,
+    ids: new Set(),
+  });
+  const selectedIds = selection.scope === scopeKey ? selection.ids : new Set<string>();
+  const selectedCompanies = companies.filter((company) => selectedIds.has(company.id));
+  const selectedPending = selectedCompanies.filter(
+    (company) => company.approvalStatus !== "APPROVED",
+  );
+
+  const hasActiveFilters = Boolean(search || category || view !== "all");
+  const resetFilters = () => clear(["q", "category", "view"]);
+
+  const handleSort = (key: string) => {
+    update(
+      sortBy === key
+        ? { sort: key, order: sortOrder === "asc" ? "desc" : "asc" }
+        : { sort: key, order: key === "name" ? "asc" : "desc" },
+    );
+  };
+
+  const runExport = async (format: "csv" | "xlsx", only?: CompanyListItem[]) => {
+    try {
+      const source = only ?? (await fetchAllCompanies(filters, sortBy, sortOrder));
+      const rows = toReportRows(source);
+      if (rows.length === 0) {
+        toast.info("Nothing to export for the current filters.");
+        return;
+      }
+
+      const scope =
+        fiscalYear && fiscalYear !== "all"
+          ? fiscalYear.replace(/[^\dA-Za-z-]/g, "-")
+          : "all-years";
+      const fileName = `companies-${scope}.${format}`;
+
+      if (format === "csv") {
+        downloadCsv(fileName, rows);
+      } else {
+        await downloadXlsx(fileName, rows, "Companies");
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Could not prepare the export."));
+    }
+  };
+
+  const buildActions = (company: CompanyListItem): RowAction[] => [
+    { label: "View profile", icon: Eye, href: `/dashboard/companies/${company.id}` },
+    {
+      label: isApprovedStatus(company.approvalStatus)
+        ? "Certificate"
+        : "Certificate after approval",
+      icon: FileBadge,
+      href: `/dashboard/companies/${company.id}/certificate`,
+      disabled: !isApprovedStatus(company.approvalStatus),
+    },
+    { label: "Edit", icon: Pencil, href: `/dashboard/companies/${company.id}/edit` },
+    {
+      label: "Approve",
+      icon: CheckCircle2,
+      onSelect: () => approveCompany(company.id),
+      hidden: !isAdmin || company.approvalStatus === "APPROVED",
+    },
+    {
+      label: "Delete",
+      icon: Trash2,
+      onSelect: () => setCompanyToDelete(company),
+      destructive: true,
+      hidden: !isAdmin,
+    },
+  ];
+
+  const columns: DataTableColumn<CompanyListItem>[] = [
+    {
+      id: "index",
+      header: "#",
+      className: "w-12 text-muted-foreground",
+      cell: (_company, index) => (page - 1) * limit + index + 1,
+    },
+    {
+      id: "name",
+      header: "Company",
+      sortKey: "name",
+      cell: (company) => (
+        <Link
+          href={`/dashboard/companies/${company.id}`}
+          className="font-medium text-primary hover:underline"
+        >
+          {company.name}
+        </Link>
+      ),
+    },
+    {
+      id: "initiator",
+      header: "Initiator",
+      cell: (company) => <RegistrationInitiatorCell initiator={company.initiatedBy} />,
+    },
+    { id: "pan", header: "PAN", cell: (company) => company.panNumber },
+    { id: "fy", header: "Fiscal year", cell: (company) => company.fiscalYear },
+    {
+      id: "category",
+      header: "Category",
+      cell: (company) => <Badge variant="outline">{company.category}</Badge>,
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (company) => (
+        <div className="flex flex-col items-start gap-1.5">
+          <ApprovalStatusBadge status={company.approvalStatus} />
+          <ContractedBadge company={company} />
+        </div>
+      ),
+    },
+    {
+      id: "contact",
+      header: "Contact",
+      sortKey: "registrationRequestDate",
+      cell: (company) => (
+        <div className="flex flex-col text-sm">
+          <span className="font-medium">{company.contactPerson || "N/A"}</span>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Phone className="h-3 w-3" aria-hidden="true" />
+            {company.phoneNumber || "N/A"}
+          </span>
+        </div>
+      ),
+    },
+  ];
+
+  const renderMobileCard = (company: CompanyListItem) => (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Link
+            href={`/dashboard/companies/${company.id}`}
+            className="font-medium text-primary hover:underline"
+          >
+            {company.name}
+          </Link>
+          <p className="text-xs text-muted-foreground">
+            PAN {company.panNumber} · {company.fiscalYear}
+          </p>
+        </div>
+        <RowActions actions={buildActions(company)} label={company.name} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline">{company.category}</Badge>
+        <ApprovalStatusBadge status={company.approvalStatus} />
+        <ContractedBadge company={company} />
+      </div>
+      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+        {company.contactPerson || "N/A"} · {company.phoneNumber || "N/A"}
+      </p>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      <ConfirmDialog
+        open={companyToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setCompanyToDelete(null);
+        }}
+        title="Delete company?"
+        description={
+          <>
+            <span className="font-semibold text-foreground">{companyToDelete?.name}</span>{" "}
+            will be permanently deleted. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete company"
+        destructive
+        isPending={isDeleting}
+        onConfirm={() => {
+          if (!companyToDelete) return;
+          deleteCompany(companyToDelete.id, {
+            onSettled: () => setCompanyToDelete(null),
+          });
+        }}
+      />
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Companies</h2>
-          <p className="text-muted-foreground">
-            Manage contractors and suppliers registry.
-          </p>
-        </div>
+      <PageHeader
+        title="Companies"
+        description="Manage the contractors and suppliers registry."
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" disabled={isError || (meta?.total ?? 0) === 0}>
+                  <Download />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => void runExport("xlsx")}>
+                  <FileSpreadsheet />
+                  Excel (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void runExport("csv")}>
+                  <FileText />
+                  CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button asChild>
+              <Link href="/dashboard/companies/new">
+                <Plus />
+                Register Company
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-        <Link href="/dashboard/companies/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Register Company
+      <FilterChips
+        label="Quick views"
+        value={view}
+        onChange={(next) => update({ view: next === "all" ? null : next })}
+        options={[
+          { value: "all", label: "All companies", count: counts?.total },
+          ...(isAdmin
+            ? [
+                {
+                  value: "pending",
+                  label: "Needs approval",
+                  count: counts?.pending,
+                  tone: "warning" as const,
+                },
+              ]
+            : []),
+          { value: "contracted", label: "Contracted", count: counts?.contracted },
+          { value: "uncontracted", label: "Not contracted", count: counts?.nonContracted },
+        ]}
+      />
+
+      <FilterBar hasActiveFilters={hasActiveFilters} onReset={resetFilters}>
+        <SearchInput
+          label="Search companies"
+          placeholder="Search by name, PAN or registration number"
+          value={search}
+          onChange={(value) => update({ q: value })}
+          className="w-full md:w-96"
+        />
+        <select
+          value={category}
+          onChange={(event) => update({ category: event.target.value || null })}
+          aria-label="Category"
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="">All categories</option>
+          {CompanyCategoryEnum.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </FilterBar>
+
+      {isError ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm">
+          <p className="font-medium text-destructive">Companies could not be loaded.</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => void refetch()}>
+            Try again
           </Button>
-        </Link>
-      </div>
-
-      {/* Stats Cards */}
-
-      <div
-        className={`grid gap-4 ${isAdmin ? "md:grid-cols-4" : "md:grid-cols-3"}`}
-      >
-        <div className="p-4 rounded-lg border bg-white dark:bg-gray-950 shadow-sm">
-          <p className="text-sm text-muted-foreground">Total Companies</p>
-          <p className="text-2xl font-bold">{totalCompanies}</p>
         </div>
-
-        {isAdmin && (
-          <div className="p-4 rounded-lg border bg-white dark:bg-gray-950 shadow-sm">
-            <p className="text-sm text-muted-foreground">Pending Approval</p>
-            <p className="text-2xl font-bold text-amber-600">
-              {pendingCompanies}
-            </p>
-          </div>
-        )}
-
-        <div className="p-4 rounded-lg border bg-white dark:bg-gray-950 shadow-sm">
-          <p className="text-sm text-muted-foreground">Contracted</p>
-          <p className="text-2xl font-bold text-green-600">
-            {contractedCompanies}
-          </p>
-        </div>
-
-        <div className="p-4 rounded-lg border bg-white dark:bg-gray-950 shadow-sm">
-          <p className="text-sm text-muted-foreground">Non Contracted</p>
-          <p className="text-2xl font-bold text-orange-600">
-            {nonContractedCompanies}
-          </p>
-        </div>
-      </div>
-
-      {/* Filters */}
-
-      <div className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-gray-950 p-4 rounded-lg border shadow-sm">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-
-          <Input
-            placeholder="Search by Name or PAN..."
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <Select value={effectiveFiscalYear} onValueChange={setFiscalYearFilter}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Fiscal Year" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_FISCAL_YEARS}>All Fiscal Years</SelectItem>
-            {fiscalYears.map((year) => (
-              <SelectItem key={year} value={year}>
-                {year}
-                {year === setup?.currentFiscalYear ? " (Current)" : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-
-          <SelectContent>
-            <SelectItem value="ALL">All Categories</SelectItem>
-
-            {CompanyCategoryEnum.options.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={contractFilter} onValueChange={setContractFilter}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Contract Status" />
-          </SelectTrigger>
-
-          <SelectContent>
-            <SelectItem value="ALL">All</SelectItem>
-            <SelectItem value="CONTRACTED">Contracted</SelectItem>
-            <SelectItem value="NON_CONTRACTED">Non Contracted</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Sort By" />
-          </SelectTrigger>
-
-          <SelectContent>
-            <SelectItem value="date-desc">Newest First</SelectItem>
-            <SelectItem value="date-asc">Oldest First</SelectItem>
-            <SelectItem value="name">Name (A-Z)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Table */}
-
-      <div className="rounded-md border bg-white dark:bg-gray-950 shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-16">S.No</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Initiator</TableHead>
-              <TableHead>PAN</TableHead>
-              <TableHead>Fiscal Year</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {isLoading ? (
-              [...Array(5)].map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <Skeleton className="h-4 w-8" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-28" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-16" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-24" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-8 w-8 ml-auto" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : filteredCompanies.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={9}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No companies found for the selected fiscal year.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredCompanies.map((company, index) => (
-                <TableRow key={company.id}>
-                  <TableCell className="text-muted-foreground">
-                    {index + 1}
-                  </TableCell>
-
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/dashboard/companies/${company.id}`}
-                      className="hover:underline text-primary"
-                    >
-                      {company.name}
-                    </Link>
-                  </TableCell>
-
-                  <TableCell>
-                    <RegistrationInitiatorCell initiator={company.initiatedBy} />
-                  </TableCell>
-
-                  <TableCell>{company.panNumber}</TableCell>
-
-                  <TableCell>{company.fiscalYear}</TableCell>
-
-                  <TableCell>
-                    <Badge variant="outline">{company.category}</Badge>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex flex-col gap-2 items-start">
-                      <ApprovalStatusBadge status={company.approvalStatus} />
-                      {isApprovedStatus(company.approvalStatus) ? (
-                        isCompanyContracted(company) ? (
-                          <Badge className="bg-green-100 text-green-700">
-                            Contracted
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Not Contracted</Badge>
-                        )
-                      ) : (
-                        <Badge variant="outline">
-                          {getAvailabilityBadgeLabel(company.approvalStatus)}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex flex-col text-sm">
-                      <span className="font-medium">
-                        {company.contactPerson || "N/A"}
-                      </span>
-
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {company.phoneNumber || "N/A"}
-                      </span>
-                    </div>
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-
-                      <DropdownMenuContent align="end">
-                        <Link href={`/dashboard/companies/${company.id}`}>
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Profile
-                          </DropdownMenuItem>
-                        </Link>
-
-                        {isApprovedStatus(company.approvalStatus) ? (
-                          <Link
-                            href={`/dashboard/companies/${company.id}/certificate`}
-                          >
-                            <DropdownMenuItem>
-                              <FileBadge className="mr-2 h-4 w-4" />
-                              Certificate
-                            </DropdownMenuItem>
-                          </Link>
-                        ) : (
-                          <DropdownMenuItem disabled>
-                            <FileBadge className="mr-2 h-4 w-4" />
-                            Certificate After Approval
-                          </DropdownMenuItem>
-                        )}
-
-                        <Link href={`/dashboard/companies/${company.id}/edit`}>
-                          <DropdownMenuItem>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                        </Link>
-
-                        {isAdmin && company.approvalStatus !== "APPROVED" && (
-                          <DropdownMenuItem
-                            disabled={isApprovingCompany}
-                            onClick={() => approveCompany(company.id)}
-                          >
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Approve
-                          </DropdownMenuItem>
-                        )}
-
-                        {isAdmin && (
-                          <DropdownMenuItem
-                            onClick={() =>
-                              setCompanyToDelete({
-                                id: company.id,
-                                name: company.name,
-                              })
-                            }
-                            className="text-red-600"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Delete Dialog */}
-
-      <AlertDialog
-        open={!!companyToDelete}
-        onOpenChange={(open) => !open && setCompanyToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Company?</AlertDialogTitle>
-
-            <AlertDialogDescription>
-              This will permanently delete
-              <strong> {companyToDelete?.name}</strong>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-
-            <AlertDialogAction
-              onClick={() => {
-                if (companyToDelete) {
-                  deleteCompany(companyToDelete.id);
-                  setCompanyToDelete(null);
-                }
-              }}
-              className="bg-red-600 hover:bg-red-700 text-white"
+      ) : (
+        <div className="space-y-3">
+          {isAdmin ? (
+            <BulkActionBar
+              count={selectedIds.size}
+              onClear={() => setSelection({ scope: scopeKey, ids: new Set() })}
             >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <Button
+                type="button"
+                size="sm"
+                disabled={selectedPending.length === 0 || isBulkApproving}
+                onClick={() => {
+                  bulkApprove(selectedPending.map((company) => company.id));
+                  setSelection({ scope: scopeKey, ids: new Set() });
+                }}
+              >
+                <CheckCircle2 />
+                Approve{selectedPending.length > 0 ? ` (${selectedPending.length})` : ""}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void runExport("xlsx", selectedCompanies)}
+              >
+                <FileSpreadsheet />
+                Export selected
+              </Button>
+            </BulkActionBar>
+          ) : null}
+
+          <div
+            className={cn(
+              "overflow-hidden rounded-xl border shadow-sm transition-opacity",
+              isFetching && !isLoading && "opacity-70",
+            )}
+          >
+            <DataTable
+              columns={columns}
+              rows={companies}
+              getRowId={(company) => company.id}
+              isLoading={isLoading}
+              minWidth={1000}
+              sort={{ key: sortBy, order: sortOrder }}
+              onSortChange={handleSort}
+              renderMobileCard={renderMobileCard}
+              rowActions={(company) => (
+                <RowActions actions={buildActions(company)} label={company.name} />
+              )}
+              selection={
+                isAdmin
+                  ? {
+                      selectedIds,
+                      onChange: (ids) => setSelection({ scope: scopeKey, ids }),
+                    }
+                  : undefined
+              }
+              empty={
+                <EmptyState
+                  icon={Building2}
+                  title={hasActiveFilters ? "No companies match these filters" : "No companies registered yet"}
+                  description={
+                    hasActiveFilters
+                      ? "Try clearing the search or choosing another fiscal year."
+                      : "Register the first company for this fiscal year."
+                  }
+                  action={
+                    hasActiveFilters ? (
+                      <Button size="sm" variant="outline" onClick={resetFilters}>
+                        Reset filters
+                      </Button>
+                    ) : (
+                      <Button asChild size="sm">
+                        <Link href="/dashboard/companies/new">
+                          <Plus />
+                          Register Company
+                        </Link>
+                      </Button>
+                    )
+                  }
+                />
+              }
+            />
+            {meta ? (
+              <Pagination
+                page={meta.page}
+                lastPage={meta.lastPage}
+                total={meta.total}
+                limit={meta.limit}
+                onPageChange={(next) => update({ page: next })}
+                onLimitChange={(next) =>
+                  update({ limit: next === DEFAULT_LIMIT ? null : next })
+                }
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function CompanyListPage() {
+  return (
+    <Suspense fallback={<CompaniesLoadingFallback />}>
+      <CompanyListContent />
+    </Suspense>
   );
 }

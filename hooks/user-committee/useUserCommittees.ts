@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -34,6 +39,8 @@ export const useUserCommittees = (params?: UserCommitteeListParams) => {
   return useQuery({
     queryKey: ["userCommittees", params],
     queryFn: () => userCommitteeService.getAll(params),
+    // Keep showing the current page while the next one loads.
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -129,6 +136,39 @@ export const useApproveUserCommittee = () => {
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to approve User Committee"));
+    },
+  });
+};
+
+/** Approves several committees in small batches and shows one summary toast. */
+export const useBulkApproveUserCommittees = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      let approved = 0;
+
+      for (let index = 0; index < ids.length; index += 5) {
+        const results = await Promise.allSettled(
+          ids
+            .slice(index, index + 5)
+            .map((id) => userCommitteeService.approve(id)),
+        );
+        approved += results.filter((result) => result.status === "fulfilled").length;
+      }
+
+      return { approved, failed: ids.length - approved };
+    },
+    onSuccess: async ({ approved, failed }) => {
+      if (failed === 0) {
+        toast.success(`${approved} committee${approved === 1 ? "" : "s"} approved`);
+      } else {
+        toast.warning(`${approved} approved, ${failed} could not be approved`);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["userCommittees"] });
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, "Failed to approve committees"));
     },
   });
 };
