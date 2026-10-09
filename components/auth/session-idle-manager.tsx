@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { apiPost } from "@/lib/api";
 import { logoutFromApp } from "@/lib/auth/logout";
 import {
@@ -10,6 +19,7 @@ import {
   SESSION_HEARTBEAT_INTERVAL_MS,
   SESSION_IDLE_CHECK_INTERVAL_MS,
   SESSION_IDLE_TIMEOUT_MS,
+  SESSION_IDLE_WARNING_MS,
 } from "@/lib/auth/session-config";
 
 const ACTIVITY_EVENTS = [
@@ -19,11 +29,101 @@ const ACTIVITY_EVENTS = [
   "touchstart",
 ] as const;
 
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function IdleWarningDialog({
+  deadline,
+  onStay,
+  onSignOut,
+}: {
+  deadline: number;
+  onStay: () => void;
+  onSignOut: () => void;
+}) {
+  const [remaining, setRemaining] = useState(() => deadline - Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setRemaining(deadline - Date.now()),
+      1000,
+    );
+    return () => window.clearInterval(intervalId);
+  }, [deadline]);
+
+  return (
+    <AlertDialog open>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Still there?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You will be signed out in{" "}
+            <span className="font-mono font-semibold text-foreground">
+              {formatCountdown(remaining)}
+            </span>{" "}
+            because of inactivity. Unsaved changes on open forms will be lost.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button type="button" variant="outline" onClick={onSignOut}>
+            Sign out now
+          </Button>
+          <Button type="button" onClick={onStay}>
+            Stay signed in
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export function SessionIdleManager() {
   const { data: session, status } = useSession();
   const lastActivityAtRef = useRef(Date.now());
   const lastKeepAliveAtRef = useRef(Date.now());
   const actionInFlightRef = useRef(false);
+  const [warningDeadline, setWarningDeadline] = useState<number | null>(null);
+
+  const keepAlive = useCallback(async () => {
+    if (actionInFlightRef.current) {
+      return;
+    }
+
+    actionInFlightRef.current = true;
+
+    try {
+      await apiPost("/auth/verify");
+    } catch {
+      // Ignore keepalive failures here. A 401 is handled centrally by the API client.
+    } finally {
+      lastKeepAliveAtRef.current = Date.now();
+      actionInFlightRef.current = false;
+    }
+  }, []);
+
+  const signOut = useCallback(async (reason: "idle" | "maxage") => {
+    if (actionInFlightRef.current) {
+      return;
+    }
+
+    actionInFlightRef.current = true;
+
+    try {
+      await logoutFromApp(`/login?reason=${reason}`);
+    } finally {
+      actionInFlightRef.current = false;
+    }
+  }, []);
+
+  const handleStaySignedIn = useCallback(() => {
+    lastActivityAtRef.current = Date.now();
+    setWarningDeadline(null);
+    void keepAlive();
+  }, [keepAlive]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -51,20 +151,30 @@ export function SessionIdleManager() {
         : 0;
 
       if (
-        idleFor >= SESSION_IDLE_TIMEOUT_MS ||
         absoluteAge >= SESSION_ABSOLUTE_TIMEOUT_MS ||
         session?.error === "SessionMaxAgeExceeded"
       ) {
-        actionInFlightRef.current = true;
-
-        try {
-          await logoutFromApp("/login");
-        } finally {
-          actionInFlightRef.current = false;
-        }
-
+        setWarningDeadline(null);
+        await signOut("maxage");
         return;
       }
+
+      if (idleFor >= SESSION_IDLE_TIMEOUT_MS) {
+        setWarningDeadline(null);
+        await signOut("idle");
+        return;
+      }
+
+      // Any activity (even a click inside the dialog) pushes the deadline out,
+      // so the prompt closes by itself once the user is back.
+      if (idleFor >= SESSION_IDLE_TIMEOUT_MS - SESSION_IDLE_WARNING_MS) {
+        setWarningDeadline(
+          lastActivityAtRef.current + SESSION_IDLE_TIMEOUT_MS,
+        );
+        return;
+      }
+
+      setWarningDeadline(null);
 
       const hasUnsyncedActivity =
         lastActivityAtRef.current > lastKeepAliveAtRef.current;
@@ -76,16 +186,7 @@ export function SessionIdleManager() {
         return;
       }
 
-      actionInFlightRef.current = true;
-
-      try {
-        await apiPost("/auth/verify");
-      } catch {
-        // Ignore keepalive failures here. A 401 is handled centrally by the API client.
-      } finally {
-        lastKeepAliveAtRef.current = Date.now();
-        actionInFlightRef.current = false;
-      }
+      await keepAlive();
     };
 
     ACTIVITY_EVENTS.forEach((eventName) => {
@@ -103,7 +204,17 @@ export function SessionIdleManager() {
         window.removeEventListener(eventName, markActivity);
       });
     };
-  }, [session?.error, session?.sessionStartedAt, status]);
+  }, [keepAlive, session?.error, session?.sessionStartedAt, signOut, status]);
 
-  return null;
+  if (warningDeadline === null) {
+    return null;
+  }
+
+  return (
+    <IdleWarningDialog
+      deadline={warningDeadline}
+      onStay={handleStaySignedIn}
+      onSignOut={() => void signOut("idle")}
+    />
+  );
 }

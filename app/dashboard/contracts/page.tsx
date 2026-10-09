@@ -6,7 +6,6 @@ import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  AlertTriangle,
   ArrowRight,
   Building2,
   CalendarClock,
@@ -28,7 +27,10 @@ import {
 } from "@/hooks/contract/useContracts";
 import { contractService } from "@/services/contract/contractService";
 import type { Contract, ContractStatus } from "@/lib/schema/contract/contract";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   ContractStatusBadge,
   CONTRACT_STATUS_LABEL,
@@ -150,57 +152,6 @@ function TimeHealthBadge({ contract }: { contract: Contract }) {
     >
       {content[health].label}
     </span>
-  );
-}
-
-function DeleteConfirmModal({
-  contract,
-  isDeleting,
-  onCancel,
-  onConfirm,
-}: {
-  contract: Contract;
-  isDeleting: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <div className="rounded-full bg-red-100 p-2 text-red-600">
-            <AlertTriangle className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold">Delete Contract</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Delete{" "}
-              <span className="font-mono font-semibold text-foreground">
-                {contract.contractNumber}
-              </span>
-              ? This action cannot be undone.
-            </p>
-          </div>
-        </div>
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={isDeleting}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-          >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -634,8 +585,7 @@ function ContractLandingContent() {
       await queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() });
       setContractToDelete(null);
     } catch (error) {
-      console.error(error);
-      alert("Failed to delete contract. Please try again.");
+      toast.error(getApiErrorMessage(error, "Failed to delete contract. Please try again."));
     } finally {
       setIsDeleting(false);
     }
@@ -643,14 +593,25 @@ function ContractLandingContent() {
 
   return (
     <>
-      {contractToDelete && (
-        <DeleteConfirmModal
-          contract={contractToDelete}
-          isDeleting={isDeleting}
-          onCancel={() => setContractToDelete(null)}
-          onConfirm={handleDeleteConfirm}
-        />
-      )}
+      <ConfirmDialog
+        open={contractToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setContractToDelete(null);
+        }}
+        title="Delete contract?"
+        description={
+          <>
+            <span className="font-mono font-semibold text-foreground">
+              {contractToDelete?.contractNumber}
+            </span>{" "}
+            will be permanently deleted. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete contract"
+        destructive
+        isPending={isDeleting}
+        onConfirm={handleDeleteConfirm}
+      />
 
       <div className="space-y-6 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

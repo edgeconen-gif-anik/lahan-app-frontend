@@ -4,6 +4,8 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import { getSession } from "next-auth/react";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { logoutFromApp } from "@/lib/auth/logout";
 
 const api = axios.create({
@@ -11,7 +13,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 10000,
+  timeout: 30000,
 });
 
 api.interceptors.request.use(
@@ -33,35 +35,72 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
+type RetryableConfig = InternalAxiosRequestConfig & {
+  skipAuth?: boolean;
+  __retried?: boolean;
+};
+
+const RETRY_DELAY_MS = 1000;
+const RETRYABLE_STATUSES = [502, 503, 504];
+
+function isTransientFailure(error: AxiosError) {
+  // No response means network failure or timeout (e.g. a cold-starting host).
+  return !error.response || RETRYABLE_STATUSES.includes(error.response.status);
+}
+
+function describeFailure(error: AxiosError) {
+  if (!error.response) {
+    return error.code === "ECONNABORTED"
+      ? "The server took too long to respond. Please try again."
+      : "Cannot reach the server. Check your internet connection.";
+  }
+
+  const status = error.response.status;
+  if (status === 403) {
+    return getApiErrorMessage(
+      error,
+      "You don't have permission to view this data.",
+    );
+  }
+  if (status >= 500) {
+    return "Something went wrong on the server. Please try again shortly.";
+  }
+
+  return null;
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const requestConfig = error.config as
-      | (InternalAxiosRequestConfig & { skipAuth?: boolean })
-      | undefined;
+    const requestConfig = error.config as RetryableConfig | undefined;
     const skipAuth = requestConfig?.skipAuth || false;
+    const isGet = requestConfig?.method?.toLowerCase() === "get";
+
+    // Retry idempotent reads once when the failure looks temporary.
+    if (
+      requestConfig &&
+      isGet &&
+      !requestConfig.__retried &&
+      !axios.isCancel(error) &&
+      isTransientFailure(error)
+    ) {
+      requestConfig.__retried = true;
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      return api.request(requestConfig);
+    }
 
     if (error.response?.status === 401 && !skipAuth) {
-      console.error("Unauthorized: token may be expired or invalid");
-
-      await logoutFromApp("/login");
+      await logoutFromApp("/login?reason=expired");
+      return Promise.reject(error);
     }
 
-    if (error.response?.status === 403) {
-      console.error("Forbidden: you don't have permission for this action");
-    }
-
-    if (error.response?.status === 409) {
-      console.error("Conflict: resource already exists");
-    }
-
-    if (error.response?.status && error.response.status >= 500) {
-      console.error("Server error: please try again later");
-    }
-
-    if (error.code === "ECONNREFUSED") {
-      console.error("Connection refused: backend server may be down");
-      console.error("Make sure NestJS is running on port 5000");
+    // Mutations report their own errors through their hooks' onError, so only
+    // failed reads are surfaced here to avoid duplicate toasts.
+    if (isGet && !skipAuth && typeof window !== "undefined") {
+      const message = describeFailure(error);
+      if (message) {
+        toast.error(message, { id: "api-read-error" });
+      }
     }
 
     return Promise.reject(error);

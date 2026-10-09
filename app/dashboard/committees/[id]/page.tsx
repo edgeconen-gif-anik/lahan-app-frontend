@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 
 import { toFormalNepaliDate } from "@/lib/date-utils";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ContractStatusBadge } from "@/components/contract-status-badge";
 import { useContracts } from "@/hooks/contract/useContracts";
 import {
@@ -70,18 +72,15 @@ export default function CommitteeDetailPage() {
   const { mutate: deleteCommittee, isPending: isDeleting } =
     useDeleteUserCommittee();
 
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
   const handleDelete = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this committee? This action cannot be undone."
-      )
-    ) {
-      deleteCommittee(id, {
-        onSuccess: () => {
-          router.push("/dashboard/committees");
-        },
-      });
-    }
+    deleteCommittee(id, {
+      onSuccess: () => {
+        router.push("/dashboard/committees");
+      },
+      onSettled: () => setConfirmDeleteOpen(false),
+    });
   };
 
   if (isLoading) {
@@ -107,6 +106,21 @@ export default function CommitteeDetailPage() {
 
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto">
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete committee?"
+        description={
+          <>
+            <span className="font-semibold text-foreground">{committee.name}</span>{" "}
+            will be permanently deleted. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete committee"
+        destructive
+        isPending={isDeleting}
+        onConfirm={handleDelete}
+      />
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-4">
@@ -152,7 +166,7 @@ export default function CommitteeDetailPage() {
 
           <Button
             variant="destructive"
-            onClick={handleDelete}
+            onClick={() => setConfirmDeleteOpen(true)}
             disabled={isDeleting}
           >
             {isDeleting ? (

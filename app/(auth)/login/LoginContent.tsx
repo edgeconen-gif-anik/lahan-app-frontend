@@ -7,7 +7,7 @@ import Link from "next/link";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Info } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,13 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthSignin: "Unable to start Google sign-in. Please try again.",
 };
 
+const SIGN_OUT_REASON_MESSAGES: Record<string, string> = {
+  expired: "Your session has expired. Please sign in again.",
+  idle: "You were signed out because of inactivity. Please sign in again.",
+  maxage:
+    "For security, sessions end after a few hours. Please sign in again.",
+};
+
 export default function LoginContent({
   isGoogleLoginEnabled,
   isGoogleLoginReady,
@@ -72,6 +79,8 @@ export default function LoginContent({
   const [isLoading, setIsLoading] = useState(false);
 
   const authError = searchParams.get("error");
+  const signOutNotice =
+    SIGN_OUT_REASON_MESSAGES[searchParams.get("reason") ?? ""] ?? null;
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -141,6 +150,14 @@ export default function LoginContent({
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {signOutNotice && !globalError && !resolvedAuthError && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>Signed out</AlertTitle>
+              <AlertDescription>{signOutNotice}</AlertDescription>
+            </Alert>
+          )}
+
           {/* Error Alert */}
           {(globalError || resolvedAuthError) && (
             <Alert variant="destructive">

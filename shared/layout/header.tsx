@@ -1,16 +1,34 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { Menu, LogOut, User as UserIcon } from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+  LogOut,
+  Menu,
+  Monitor,
+  Moon,
+  Sun,
+  User as UserIcon,
+} from "lucide-react";
 import { Sidebar } from "./sidebar"; // Reuse sidebar for mobile menu
 
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -21,6 +39,8 @@ import { useSystemSetup } from "@/hooks/setup/useSetup";
 export function Header() {
   const { data: session } = useSession();
   const { data: setup } = useSystemSetup();
+  const { theme = "system", setTheme } = useTheme();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const userInitials = session?.user?.name
     ? session.user.name.slice(0, 2).toUpperCase()
@@ -30,14 +50,18 @@ export function Header() {
     <header className="flex h-16 items-center border-b bg-background px-6">
       {/* Mobile Menu Trigger */}
       <div className="mr-4 md:hidden">
-        <Sheet>
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Open navigation menu">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0">
-            <Sidebar />
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <SheetDescription className="sr-only">
+              Main navigation menu
+            </SheetDescription>
+            <Sidebar onNavigate={() => setMobileNavOpen(false)} />
           </SheetContent>
         </Sheet>
       </div>
@@ -53,7 +77,11 @@ export function Header() {
       {/* User Profile Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Button
+            variant="ghost"
+            className="relative h-8 w-8 rounded-full"
+            aria-label="Open user menu"
+          >
             <Avatar className="h-8 w-8">
               <AvatarImage
                 src={session?.user?.image || ""}
@@ -75,10 +103,32 @@ export function Header() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
-            <UserIcon className="mr-2 h-4 w-4" />
-            <span>Profile</span>
-          </DropdownMenuItem>
+          {session?.user?.id ? (
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/users/${session.user.id}`}>
+                <UserIcon className="mr-2 h-4 w-4" />
+                <span>My profile</span>
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            Appearance
+          </DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+            <DropdownMenuRadioItem value="light">
+              <Sun className="mr-2 h-4 w-4" />
+              Light
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="dark">
+              <Moon className="mr-2 h-4 w-4" />
+              Dark
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="system">
+              <Monitor className="mr-2 h-4 w-4" />
+              System
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => logoutFromApp("/login")}

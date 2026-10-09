@@ -18,6 +18,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   FUEL_SOURCE_LABEL,
@@ -295,19 +296,11 @@ export default function FuelLogsPage() {
     approveFuelLog({ id: fuelLog.id });
   };
 
-  const handleReject = (fuelLog: FuelLog) => {
-    const remarks = window.prompt(
-      "Reason for rejection",
-      fuelLog.remarks ?? "",
-    );
-    if (remarks === null) return;
-    rejectFuelLog({ id: fuelLog.id, remarks });
-  };
+  const [fuelLogToReject, setFuelLogToReject] = useState<FuelLog | null>(null);
+  const [fuelLogToDelete, setFuelLogToDelete] = useState<FuelLog | null>(null);
 
-  const handleDelete = (fuelLog: FuelLog) => {
-    if (!window.confirm("Delete this fuel log permanently?")) return;
-    deleteFuelLog(fuelLog.id);
-  };
+  const handleReject = (fuelLog: FuelLog) => setFuelLogToReject(fuelLog);
+  const handleDelete = (fuelLog: FuelLog) => setFuelLogToDelete(fuelLog);
 
   return (
     <div className="space-y-6 p-6">
@@ -504,6 +497,61 @@ export default function FuelLogsPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={fuelLogToReject !== null}
+        onOpenChange={(open) => {
+          if (!open) setFuelLogToReject(null);
+        }}
+        title="Reject fuel log?"
+        description="The requester will see the reason you enter below."
+        confirmLabel="Reject"
+        destructive
+        isPending={isRejecting}
+        reason={{
+          label: "Reason for rejection",
+          defaultValue: fuelLogToReject?.remarks ?? "",
+          required: true,
+        }}
+        onConfirm={(remarks) => {
+          if (!fuelLogToReject) return;
+          rejectFuelLog(
+            { id: fuelLogToReject.id, remarks },
+            { onSettled: () => setFuelLogToReject(null) },
+          );
+        }}
+      />
+
+      <ConfirmDialog
+        open={fuelLogToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setFuelLogToDelete(null);
+        }}
+        title="Delete fuel log?"
+        description={
+          fuelLogToDelete ? (
+            <>
+              The {fuelLogToDelete.quantityLiters} L {fuelLogToDelete.fuelType}{" "}
+              entry for{" "}
+              <span className="font-semibold text-foreground">
+                {fuelLogToDelete.project?.name ||
+                  fuelLogToDelete.contract?.contractNumber ||
+                  fuelLogToDelete.purpose}
+              </span>{" "}
+              will be permanently deleted.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete"
+        destructive
+        isPending={isDeleting}
+        onConfirm={() => {
+          if (!fuelLogToDelete) return;
+          deleteFuelLog(fuelLogToDelete.id, {
+            onSettled: () => setFuelLogToDelete(null),
+          });
+        }}
+      />
     </div>
   );
 }

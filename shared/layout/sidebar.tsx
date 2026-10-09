@@ -11,6 +11,7 @@ import {
   FileBarChart2,
   Fuel,
   Users,
+  UserCog,
   Building2,
   Settings,
 } from "lucide-react";
@@ -23,13 +24,16 @@ const sidebarItems = [
   { icon: FileBarChart2, label: "Reports", href: "/dashboard/reports" },
   { icon: Users, label: "Committees", href: "/dashboard/committees" },
   { icon: Building2, label: "Companies", href: "/dashboard/companies" },
-  { icon: Users, label: "Users", href: "/dashboard/users", adminOnly: true },
+  { icon: UserCog, label: "Users", href: "/dashboard/users", adminOnly: true },
   { icon: Settings, label: "Setup", href: "/dashboard/setup", adminOnly: true },
 ];
 
-type SidebarProps = React.HTMLAttributes<HTMLDivElement>;
+type SidebarProps = React.HTMLAttributes<HTMLDivElement> & {
+  /** Called after a nav link is clicked (e.g. to close the mobile drawer). */
+  onNavigate?: () => void;
+};
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
@@ -82,6 +86,8 @@ export function Sidebar({ className }: SidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onNavigate}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
                     isActive

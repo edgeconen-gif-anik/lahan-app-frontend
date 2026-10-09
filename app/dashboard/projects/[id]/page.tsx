@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -10,6 +10,7 @@ import { useDeleteProject, useProject } from "@/hooks/project/useProjects";
 import { deriveProjectStatusFromContracts } from "@/lib/project-status";
 import { toNepaliDate } from "@/lib/date-utils";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ContractStatusBadge } from "@/components/contract-status-badge";
 
 export default function ProjectProfilePage() {
@@ -22,7 +23,8 @@ export default function ProjectProfilePage() {
   const { data: contracts = [], isLoading: isContractsLoading } = useContracts({
     projectId: id as string,
   });
-  const { mutate: deleteProject } = useDeleteProject();
+  const { mutate: deleteProject, isPending: isDeleting } = useDeleteProject();
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const displayStatus = useMemo(() => {
     if (!project) return "NOT_STARTED";
@@ -40,6 +42,29 @@ export default function ProjectProfilePage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete project?"
+        description={
+          <>
+            <span className="font-semibold text-foreground">{project.name}</span>{" "}
+            will be permanently deleted
+            {contracts.length > 0
+              ? `, and it has ${contracts.length} linked contract${contracts.length > 1 ? "s" : ""}`
+              : ""}
+            . This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete project"
+        destructive
+        isPending={isDeleting}
+        onConfirm={() =>
+          deleteProject(project.id, {
+            onSettled: () => setConfirmDeleteOpen(false),
+          })
+        }
+      />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-sm text-muted-foreground">
@@ -67,7 +92,7 @@ export default function ProjectProfilePage() {
             </Link>
             <button
               type="button"
-              onClick={() => confirm("Are you sure?") && deleteProject(project.id)}
+              onClick={() => setConfirmDeleteOpen(true)}
               className="inline-flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive hover:text-white"
             >
               <Trash2 className="h-4 w-4" />
