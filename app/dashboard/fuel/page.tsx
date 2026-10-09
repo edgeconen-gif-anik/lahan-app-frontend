@@ -6,6 +6,7 @@ import { useRole } from "@/lib/auth/use-role";
 import {
   CheckCircle2,
   BookOpen,
+  Copy,
   Droplets,
   FileText,
   Fuel,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { RowActions } from "@/components/data/row-actions";
 import { EmptyState } from "@/components/empty-state";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Button } from "@/components/ui/button";
@@ -192,51 +194,50 @@ function FuelRow({
               </Button>
             </>
           ) : null}
-          {canEdit ? (
-            <Button type="button" size="sm" variant="outline" asChild>
-              <Link href={`/dashboard/fuel/${fuelLog.id}/edit`}>
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Link>
-            </Button>
-          ) : null}
-          <Button type="button" size="sm" variant="outline" asChild>
-            <Link href={`/dashboard/fuel/${fuelLog.id}/demand-form`}>
-              <FileText className="h-4 w-4" />
-              माग फारम
-            </Link>
-          </Button>
-          <Button type="button" size="sm" variant="outline" asChild>
-            <Link href={`/dashboard/fuel/${fuelLog.id}/log-book`}>
-              <BookOpen className="h-4 w-4" />
-              Log Book
-            </Link>
-          </Button>
-          <Button type="button" size="sm" variant="outline" asChild>
-            <Link href={`/dashboard/fuel/${fuelLog.id}/fuel-coupon`}>
-              <Ticket className="h-4 w-4" />
-              Coupon
-            </Link>
-          </Button>
-          <Button type="button" size="sm" variant="outline" asChild>
-            <Link href={`/dashboard/fuel/${fuelLog.id}/print`}>
-              <Printer className="h-4 w-4" />
-              All
-            </Link>
-          </Button>
-          {isAdmin ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={isDeleting}
-              onClick={onDelete}
-              className="gap-1 text-red-600"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </Button>
-          ) : null}
+          <RowActions
+            label={`fuel log ${fuelLog.purpose}`}
+            actions={[
+              {
+                label: "Edit",
+                icon: Pencil,
+                href: `/dashboard/fuel/${fuelLog.id}/edit`,
+                hidden: !canEdit,
+              },
+              {
+                label: "Duplicate",
+                icon: Copy,
+                href: `/dashboard/fuel/new?from=${fuelLog.id}`,
+              },
+              {
+                label: "माग फारम",
+                icon: FileText,
+                href: `/dashboard/fuel/${fuelLog.id}/demand-form`,
+              },
+              {
+                label: "Log Book",
+                icon: BookOpen,
+                href: `/dashboard/fuel/${fuelLog.id}/log-book`,
+              },
+              {
+                label: "Coupon",
+                icon: Ticket,
+                href: `/dashboard/fuel/${fuelLog.id}/fuel-coupon`,
+              },
+              {
+                label: "Print all",
+                icon: Printer,
+                href: `/dashboard/fuel/${fuelLog.id}/print`,
+              },
+              {
+                label: "Delete",
+                icon: Trash2,
+                onSelect: onDelete,
+                destructive: true,
+                hidden: !isAdmin,
+                disabled: isDeleting,
+              },
+            ]}
+          />
         </div>
       </td>
     </tr>

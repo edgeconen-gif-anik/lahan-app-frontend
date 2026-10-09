@@ -21,8 +21,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MoneyInput } from "@/components/form/money-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatIndianNumber } from "@/lib/money";
 import { useCompanies } from "@/hooks/company/useCompany";
 import { useSystemSetup } from "@/hooks/setup/useSetup";
 import { useUserCommittees } from "@/hooks/user-committee/useUserCommittees";
@@ -90,6 +92,31 @@ const STATUS_OPTIONS = [
 
 function stringifyValue(value: unknown) {
   return value === null || value === undefined ? "" : String(value);
+}
+
+// The form keeps amounts as text; this bridges to the numeric money field.
+function BudgetInput({
+  id,
+  value,
+  onChange,
+  invalid,
+  showWords = false,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  invalid: boolean;
+  showWords?: boolean;
+}) {
+  return (
+    <MoneyInput
+      id={id}
+      value={Number(value) || 0}
+      onValueChange={(amount) => onChange(amount ? String(amount) : "")}
+      invalid={invalid}
+      showWords={showWords}
+    />
+  );
 }
 
 function buildFormState(defaultValues?: Partial<ProjectFormValues>): ProjectFormState {
@@ -429,23 +456,19 @@ export function ProjectForm({
             error={errors.allocatedBudget}
             icon={<CircleDollarSign className="h-4 w-4" />}
           >
-            <Input
+            <BudgetInput
               id="allocatedBudget"
-              type="number"
-              min="0"
-              step="0.01"
               value={formData.allocatedBudget}
-              onChange={(event) =>
-                handleChange("allocatedBudget", event.target.value)
-              }
-              aria-invalid={Boolean(errors.allocatedBudget)}
+              onChange={(value) => handleChange("allocatedBudget", value)}
+              invalid={Boolean(errors.allocatedBudget)}
+              showWords
             />
           </FieldShell>
 
           <div className="rounded-lg border bg-muted/40 p-4">
             <p className="text-sm font-medium text-muted-foreground">Source Split</p>
             <p className="mt-1 text-2xl font-semibold">
-              Rs. {budgetTotal.toLocaleString()}
+              Rs. {formatIndianNumber(budgetTotal) || "0"}
             </p>
           </div>
 
@@ -455,16 +478,11 @@ export function ProjectForm({
             error={errors.internalBudget}
             icon={<CircleDollarSign className="h-4 w-4" />}
           >
-            <Input
+            <BudgetInput
               id="internalBudget"
-              type="number"
-              min="0"
-              step="0.01"
               value={formData.internalBudget}
-              onChange={(event) =>
-                handleChange("internalBudget", event.target.value)
-              }
-              aria-invalid={Boolean(errors.internalBudget)}
+              onChange={(value) => handleChange("internalBudget", value)}
+              invalid={Boolean(errors.internalBudget)}
             />
           </FieldShell>
 
@@ -474,16 +492,11 @@ export function ProjectForm({
             error={errors.centralBudget}
             icon={<CircleDollarSign className="h-4 w-4" />}
           >
-            <Input
+            <BudgetInput
               id="centralBudget"
-              type="number"
-              min="0"
-              step="0.01"
               value={formData.centralBudget}
-              onChange={(event) =>
-                handleChange("centralBudget", event.target.value)
-              }
-              aria-invalid={Boolean(errors.centralBudget)}
+              onChange={(value) => handleChange("centralBudget", value)}
+              invalid={Boolean(errors.centralBudget)}
             />
           </FieldShell>
 
@@ -493,16 +506,11 @@ export function ProjectForm({
             error={errors.provinceBudget}
             icon={<CircleDollarSign className="h-4 w-4" />}
           >
-            <Input
+            <BudgetInput
               id="provinceBudget"
-              type="number"
-              min="0"
-              step="0.01"
               value={formData.provinceBudget}
-              onChange={(event) =>
-                handleChange("provinceBudget", event.target.value)
-              }
-              aria-invalid={Boolean(errors.provinceBudget)}
+              onChange={(value) => handleChange("provinceBudget", value)}
+              invalid={Boolean(errors.provinceBudget)}
             />
           </FieldShell>
         </CardContent>

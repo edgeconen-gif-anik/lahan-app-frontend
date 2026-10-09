@@ -17,6 +17,8 @@ import type {
 } from "@/lib/schema/fuel/fuel";
 import { FUEL_SOURCE_LABEL, FUEL_TYPE_LABEL } from "@/lib/schema/fuel/fuel";
 import { NepaliDatePicker } from "@/components/ui/nepali-date-picker";
+import { MoneyInput } from "@/components/form/money-input";
+import { formatIndianNumber, numberToWordsIndian } from "@/lib/money";
 
 type FuelFormValues = {
   userId: string;
@@ -38,12 +40,18 @@ type FuelFormProps = {
   isSubmitting: boolean;
   mode: "create" | "edit";
   onSubmit: (payload: FuelLogPayload) => void;
+  /** Shown above the form, e.g. "Copied from an earlier entry". */
+  notice?: string;
 };
 
-const today = new Date().toISOString().slice(0, 10);
+// Today's date in Nepal. The UTC date is a day behind for the first six hours
+// after midnight there, which would default new logs to yesterday.
+function todayInNepal() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" });
+}
 
 function isoDateInput(value?: string | null) {
-  return value ? new Date(value).toISOString().slice(0, 10) : today;
+  return value ? new Date(value).toISOString().slice(0, 10) : todayInNepal();
 }
 
 function emptyToUndefined(value: string) {
@@ -62,6 +70,7 @@ export function FuelForm({
   isSubmitting,
   mode,
   onSubmit,
+  notice,
 }: FuelFormProps) {
   const { isAdmin } = useRole();
   const [form, setForm] = useState<FuelFormValues>({
@@ -86,6 +95,16 @@ export function FuelForm({
   });
   const [searchUser, setSearchUser] = useState("");
   const [searchProject, setSearchProject] = useState("");
+  const [didAttemptSubmit, setDidAttemptSubmit] = useState(false);
+
+  const quantityError =
+    didAttemptSubmit && !(Number(form.quantityLiters) > 0)
+      ? "Enter a quantity greater than 0."
+      : undefined;
+  const purposeError =
+    didAttemptSubmit && !form.purpose.trim()
+      ? "Describe what the fuel is used for."
+      : undefined;
 
   const { data: users, isLoading: isLoadingUsers } = useUsers(
     { search: searchUser || undefined, limit: 50 },
@@ -130,6 +149,11 @@ export function FuelForm({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setDidAttemptSubmit(true);
+
+    if (!(Number(form.quantityLiters) > 0) || !form.purpose.trim()) {
+      return;
+    }
 
     const payload: FuelLogPayload = {
       ...(isAdmin && form.userId ? { userId: form.userId } : {}),
@@ -152,7 +176,7 @@ export function FuelForm({
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-start gap-3">
         <Button variant="outline" size="icon" asChild>
           <Link href="/dashboard/fuel">
@@ -170,7 +194,17 @@ export function FuelForm({
         </div>
       </div>
 
+      {notice ? (
+        <p
+          role="status"
+          className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm"
+        >
+          {notice}
+        </p>
+      ) : null}
+
       <form
+        noValidate
         onSubmit={handleSubmit}
         className="space-y-6 rounded-xl border bg-card p-6 shadow-sm"
       >
@@ -308,37 +342,48 @@ export function FuelForm({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Quantity (liters)</label>
+            <label htmlFor="quantityLiters" className="text-sm font-medium">
+              Quantity (liters) <span className="text-destructive">*</span>
+            </label>
             <input
+              id="quantityLiters"
               type="number"
+              inputMode="decimal"
               min="0"
               step="0.01"
               value={form.quantityLiters}
               onChange={(event) =>
                 handleChange("quantityLiters", event.target.value)
               }
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              required
+              aria-invalid={Boolean(quantityError) || undefined}
+              className={`h-10 w-full rounded-md border bg-background px-3 text-sm ${
+                quantityError ? "border-destructive/60 bg-destructive/5" : ""
+              }`}
             />
+            {quantityError ? (
+              <p role="alert" className="text-xs font-medium text-destructive">
+                {quantityError}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Rate Per Liter</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.ratePerLiter}
-              onChange={(event) =>
-                handleChange("ratePerLiter", event.target.value)
+            <label htmlFor="ratePerLiter" className="text-sm font-medium">
+              Rate Per Liter
+            </label>
+            <MoneyInput
+              id="ratePerLiter"
+              value={Number(form.ratePerLiter) || 0}
+              onValueChange={(value) =>
+                handleChange("ratePerLiter", value ? String(value) : "")
               }
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              showWords={false}
               placeholder="Optional"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground" aria-live="polite">
               {estimatedTotal == null
                 ? "Total amount will remain blank unless a rate is provided."
-                : `Estimated total: Rs. ${estimatedTotal.toLocaleString()}`}
+                : `Estimated total: Rs. ${formatIndianNumber(estimatedTotal)} — ${numberToWordsIndian(estimatedTotal)}`}
             </p>
           </div>
 
@@ -371,14 +416,24 @@ export function FuelForm({
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-medium">Purpose</label>
+            <label htmlFor="purpose" className="text-sm font-medium">
+              Purpose <span className="text-destructive">*</span>
+            </label>
             <textarea
+              id="purpose"
               value={form.purpose}
               onChange={(event) => handleChange("purpose", event.target.value)}
-              className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm"
-              required
+              aria-invalid={Boolean(purposeError) || undefined}
+              className={`min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm ${
+                purposeError ? "border-destructive/60 bg-destructive/5" : ""
+              }`}
               placeholder="Purpose of fuel use"
             />
+            {purposeError ? (
+              <p role="alert" className="text-xs font-medium text-destructive">
+                {purposeError}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2 md:col-span-2">

@@ -65,7 +65,8 @@ function IdleWarningDialog({
             <span className="font-mono font-semibold text-foreground">
               {formatCountdown(remaining)}
             </span>{" "}
-            because of inactivity. Unsaved changes on open forms will be lost.
+            because of inactivity. A contract in progress is kept as a draft on
+            this device; other unsaved changes will be lost.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
