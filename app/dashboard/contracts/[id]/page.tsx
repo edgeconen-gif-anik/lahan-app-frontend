@@ -1,19 +1,27 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { useRole } from "@/lib/auth/use-role";
-import { useRouter, useParams } from "next/navigation";
+import React, { useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft, Edit, FileText, ClipboardList, CheckSquare,
-  Building2, Users, User, Hash, AlertTriangle,
-  CheckCircle2, Clock, BadgeCheck, Loader2,
-  ChevronDown, Pencil, Ban, Printer,
-  CalendarDays, TrendingUp, Archive, ReceiptText,
+  AlertTriangle, ArrowRight, Archive, Building2, CalendarDays, CheckCircle2,
+  CheckSquare, ClipboardList, Edit, FileText, Hash, Loader2, MoreHorizontal,
+  Pencil, ReceiptText, RefreshCw, User, Users, Wallet,
 } from "lucide-react";
+
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
-import { useApproveContract, useContract, useUpdateContract } from "@/hooks/contract/useContracts";
-import { useProject } from "@/hooks/project/useProjects";
-import type { UpdateContractPayload } from "@/lib/schema/contract/contract";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ContractTimeline } from "@/components/contracts/detail/contract-timeline";
+import { DocumentPanel } from "@/components/contracts/detail/document-panel";
+import { StatusStepper } from "@/components/contracts/detail/status-stepper";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useRole } from "@/lib/auth/use-role";
 import {
   buildAgreementDraftFromContract,
   buildWorkOrderDraftFromContract,
@@ -23,1305 +31,595 @@ import {
   getDocumentSignatoryLabel,
   hasCustomDocumentText,
 } from "@/lib/contract-documents";
-import { toNepaliDate } from "@/lib/date-utils";
+import {
+  STATUS_CONFIG, daysBetween, formatBsDate, formatRelativeTime, formatUserName,
+  getNextMilestone, getTimeHealth, type ContractStatus,
+} from "@/lib/contract-detail-utils";
+import { useApproveContract, useContract, useUpdateContract } from "@/hooks/contract/useContracts";
+import { useProject } from "@/hooks/project/useProjects";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Small building blocks ────────────────────────────────────────────────────
 
-type ContractStatus =
-  | "NOT_STARTED" | "AGREEMENT" | "WORKORDER"
-  | "WORKINPROGRESS" | "COMPLETED" | "ARCHIVED";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatBsDate(iso?: string | null): string {
-  if (!iso) return "—";
-  try {
-    return toNepaliDate(new Date(iso)) ?? new Date(iso).toLocaleDateString();
-  } catch {
-    return new Date(iso).toLocaleDateString();
-  }
-}
-
-function formatCurrency(amount?: number | string | null): string {
-  if (amount == null || amount === "") return "—";
-  const numericAmount = Number(amount);
-  if (Number.isNaN(numericAmount)) return "—";
-  return "रू " + numericAmount.toLocaleString("en-IN");
-}
-
-function formatUserName(user?: { name?: string | null; email?: string | null } | null): string {
-  return user?.name || user?.email || "Unknown user";
-}
-
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
-}
-
-// Derive the "time health" of a contract based purely on dates + status
-function getTimeHealth(contract: {
-  startDate?: string | null;
-  intendedCompletionDate?: string | null;
-  actualCompletionDate?: string | null;
-  status?: string;
-}): "ongoing" | "overdue" | "completed" | "not_started" | "archived" {
-  const { startDate, intendedCompletionDate, actualCompletionDate, status } = contract;
-  if (status === "ARCHIVED") return "archived";
-  if (status === "COMPLETED" || actualCompletionDate) return "completed";
-  const now = new Date();
-  const start = startDate ? new Date(startDate) : null;
-  const intended = intendedCompletionDate ? new Date(intendedCompletionDate) : null;
-  if (!start || now < start) return "not_started";
-  if (intended && now > intended) return "overdue";
-  return "ongoing";
-}
-
-// ─── Status config ────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<ContractStatus, {
-  label: string;
-  icon: React.ReactNode;
-  pill: string;
-  dot: string;
-}> = {
-  NOT_STARTED: {
-    label: "Not Started",
-    icon: <Clock size={13} />,
-    pill: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
-    dot: "bg-slate-400",
-  },
-  AGREEMENT: {
-    label: "Agreement",
-    icon: <FileText size={13} />,
-    pill: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800",
-    dot: "bg-blue-500",
-  },
-  WORKORDER: {
-    label: "Work Order",
-    icon: <ClipboardList size={13} />,
-    pill: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-800",
-    dot: "bg-violet-500",
-  },
-  WORKINPROGRESS: {
-    label: "In Progress",
-    icon: <TrendingUp size={13} />,
-    pill: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800",
-    dot: "bg-amber-500",
-  },
-  COMPLETED: {
-    label: "Completed",
-    icon: <BadgeCheck size={13} />,
-    pill: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/60 dark:text-green-400 dark:border-green-800",
-    dot: "bg-green-500",
-  },
-  ARCHIVED: {
-    label: "Archived",
-    icon: <Archive size={13} />,
-    pill: "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700",
-    dot: "bg-zinc-400",
-  },
-};
-
-const STATUS_ORDER: ContractStatus[] = [
-  "NOT_STARTED", "AGREEMENT", "WORKORDER", "WORKINPROGRESS", "COMPLETED", "ARCHIVED",
-];
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status?: string }) {
-  const cfg = STATUS_CONFIG[(status as ContractStatus) ?? "NOT_STARTED"] ?? STATUS_CONFIG.NOT_STARTED;
+function StatusBadge({ status }: { status: ContractStatus }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.NOT_STARTED;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.pill}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${cfg.pill}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} aria-hidden="true" />
       {cfg.label}
     </span>
   );
 }
 
-// ─── Time Health Badge ────────────────────────────────────────────────────────
-
-function TimeHealthBadge({ health }: { health: ReturnType<typeof getTimeHealth> }) {
-  const configs = {
-    ongoing:     { label: "Ongoing",     cls: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800", icon: <TrendingUp size={12} /> },
-    overdue:     { label: "Overdue",     cls: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800",                         icon: <Ban size={12} /> },
-    completed:   { label: "Completed",   cls: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400 dark:border-green-800",              icon: <CheckCircle2 size={12} /> },
-    not_started: { label: "Not Started", cls: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",               icon: <Clock size={12} /> },
-    archived:    { label: "Archived",    cls: "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700",                     icon: <Archive size={12} /> },
-  };
-  const cfg = configs[health];
+function Card({ title, icon, children, action }: {
+  title: string; icon?: React.ReactNode; children: React.ReactNode; action?: React.ReactNode;
+}) {
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.cls}`}>
-      {cfg.icon}
-      {cfg.label}
-    </span>
+    <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <header className="flex items-center justify-between gap-2 border-b bg-muted/20 px-4 py-3 sm:px-5">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          {icon && <span className="text-primary" aria-hidden="true">{icon}</span>}
+          {title}
+        </h2>
+        {action}
+      </header>
+      <div className="px-4 py-4 sm:px-5">{children}</div>
+    </section>
   );
 }
 
-// ─── Status Update Dropdown ───────────────────────────────────────────────────
-
-function StatusUpdater({
-  currentStatus,
-  contractId,
-  canUpdateStatus,
-  disabledReason,
-  onUpdated,
-}: {
-  currentStatus?: string;
-  contractId: string;
-  canUpdateStatus: boolean;
-  disabledReason?: string;
-  onUpdated: (newStatus: ContractStatus) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const router = useRouter();
-
-  const { mutateAsync: updateContract } = useUpdateContract();
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const getStatusBlockReason = (status: ContractStatus) => {
-    if (!canUpdateStatus) return disabledReason ?? "Status update is unavailable.";
-    if (status === currentStatus) return null;
-    if (currentStatus === "ARCHIVED") return "Archived contracts cannot move to another milestone.";
-    if (status === "ARCHIVED") return null;
-
-    const currentIndex = STATUS_ORDER.indexOf(currentStatus as ContractStatus);
-    const nextIndex = STATUS_ORDER.indexOf(status);
-
-    if (currentIndex === -1 || nextIndex === -1) {
-      return "This milestone is not supported for this contract.";
-    }
-
-    if (nextIndex < currentIndex) {
-      return "Contract milestone cannot move backwards.";
-    }
-
-    return null;
-  };
-
-  const handleSelect = async (status: ContractStatus) => {
-    if (getStatusBlockReason(status)) return;
-    if (status === currentStatus) { setOpen(false); return; }
-    if (status === "COMPLETED") {
-      setOpen(false);
-      router.push(`/dashboard/contracts/${contractId}/contract-update`);
-      return;
-    }
-    setSaving(true);
-    try {
-      const statusUpdate: UpdateContractPayload & { status?: ContractStatus } = {
-        status,
-      };
-
-      await updateContract({ id: contractId, data: statusUpdate });
-      onUpdated(status);
-    } catch {
-      // useUpdateContract already surfaces the backend message via toast.
-    } finally {
-      setSaving(false);
-      setOpen(false);
-    }
-  };
-
+function InfoRow({ label, value, accent }: { label: string; value?: React.ReactNode; accent?: boolean }) {
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((p) => !p)}
-        disabled={saving || !canUpdateStatus}
-        title={disabledReason}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-background text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
-      >
-        {saving ? <Loader2 size={13} className="animate-spin" /> : <Pencil size={13} />}
-        Update Status
-        <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-50 w-52 bg-popover border rounded-xl shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100">
-          <div className="p-1.5">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
-              Set Status
-            </p>
-            {STATUS_ORDER.map((s) => {
-              const cfg = STATUS_CONFIG[s];
-              const isActive = s === currentStatus;
-              const blockReason = getStatusBlockReason(s);
-              return (
-                <button
-                  key={s}
-                  onClick={() => handleSelect(s)}
-                  disabled={Boolean(blockReason)}
-                  title={blockReason ?? undefined}
-                  className={`w-full flex items-center gap-2 px-2.5 py-2 text-sm rounded-lg transition-colors text-left
-                    ${isActive ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent"}
-                    ${blockReason ? "cursor-not-allowed opacity-50 hover:bg-transparent" : ""}`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
-                  {cfg.label}
-                  {isActive && <CheckCircle2 size={12} className="ml-auto text-primary" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {disabledReason && (
-        <p className="mt-1 max-w-52 text-right text-[11px] leading-4 text-muted-foreground">
-          {disabledReason}
-        </p>
-      )}
+    <div className="flex flex-col gap-0.5 border-b py-2.5 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+      <dd className={`min-w-0 text-sm font-medium sm:text-right ${accent ? "text-primary" : ""}`}>{value ?? "—"}</dd>
     </div>
   );
 }
 
-// ─── Contract Timeline ────────────────────────────────────────────────────────
-
-function ContractTimeline({ contract }: {
-  contract: {
-    startDate?: string | null;
-    intendedCompletionDate?: string | null;
-    actualCompletionDate?: string | null;
-    status?: string;
-  };
+function Kpi({ label, value, hint, tone = "neutral", icon }: {
+  label: string; value: React.ReactNode; hint?: React.ReactNode;
+  tone?: "neutral" | "good" | "bad"; icon: React.ReactNode;
 }) {
-  const { startDate, intendedCompletionDate, actualCompletionDate } = contract;
-  if (!startDate || !intendedCompletionDate) return null;
-
-  const start    = new Date(startDate);
-  const intended = new Date(intendedCompletionDate);
-  const actual   = actualCompletionDate ? new Date(actualCompletionDate) : null;
-  const now      = new Date();
-
-  // Timeline span: start → max(intended, actual, now) + small padding
-  const endAnchor = actual
-    ? new Date(Math.max(intended.getTime(), actual.getTime(), now.getTime()))
-    : new Date(Math.max(intended.getTime(), now.getTime()));
-
-  // Add 5% padding on each side so markers aren't clipped
-  const totalSpan  = endAnchor.getTime() - start.getTime();
-  const padMs      = totalSpan * 0.05;
-  const rangeStart = new Date(start.getTime() - padMs);
-  const rangeEnd   = new Date(endAnchor.getTime() + padMs);
-  const range      = rangeEnd.getTime() - rangeStart.getTime();
-
-  const pct = (d: Date) =>
-    Math.max(0, Math.min(100, ((d.getTime() - rangeStart.getTime()) / range) * 100));
-
-  const startPct    = pct(start);
-  const intendedPct = pct(intended);
-  const actualPct   = actual ? pct(actual) : null;
-  const nowPct      = pct(now);
-
-  const totalDays      = daysBetween(start, intended);
-  const elapsedDays    = Math.max(0, daysBetween(start, now));
-  const remainingDays  = daysBetween(now, intended);
-  const isOverdue      = now > intended && !actual;
-  const isCompleted    = !!actual;
-  const overdueByDays  = isOverdue ? Math.abs(remainingDays) : 0;
-
-  // Progress bar fill: from start → min(now, intended)
-  const progressEnd     = actual ? actual : (now < intended ? now : intended);
-  const progressFillPct = pct(progressEnd) - startPct;
-
-  const barColor = isCompleted
-    ? "bg-green-500"
-    : isOverdue
-    ? "bg-red-500"
-    : "bg-primary";
-
-  // ── Staggered label collision fix ────────────────────────────────────────
-  // Build an ordered list of bottom-row markers sorted left→right, then assign
-  // alternating lane depths (lane 0 = closer, lane 1 = further) so adjacent
-  // labels never share the same vertical position.
-  type MarkerDef = {
-    pct: number;
-    color: string;
-    sublabel: string;
-    label: string;
-    diamond?: boolean;
-    today?: boolean;
-    top?: boolean;   // rendered above the bar
-  };
-
-  const bottomMarkers: MarkerDef[] = [
-    { pct: startPct,    color: "bg-slate-500", sublabel: "Start",        label: formatBsDate(startDate) },
-    { pct: intendedPct, color: isOverdue ? "bg-red-500" : isCompleted ? "bg-green-500" : "bg-primary",
-      sublabel: "Intended End", label: formatBsDate(intendedCompletionDate) },
-    ...(actual && actualPct !== null
-      ? [{ pct: actualPct, color: "bg-green-500", sublabel: "Actual End", label: formatBsDate(actualCompletionDate), diamond: true }]
-      : []),
-  ].sort((a, b) => a.pct - b.pct);
-
-  // Assign lane 0/1 alternating — but if two markers are very close (<12 pct apart)
-  // force them into different lanes even if alternation already handled it.
-  const lanes: number[] = bottomMarkers.map((_, i) => i % 2);
-  for (let i = 1; i < bottomMarkers.length; i++) {
-    if (bottomMarkers[i].pct - bottomMarkers[i - 1].pct < 14 && lanes[i] === lanes[i - 1]) {
-      lanes[i] = 1 - lanes[i - 1];
-    }
-  }
-
-  // Lane depth: lane 0 = 36px below bar, lane 1 = 68px below bar
-  const LANE_Y = [36, 68];
-
-  return (
-    <div className="space-y-4">
-
-      {/* Summary chips */}
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border text-muted-foreground">
-          <CalendarDays size={11} />
-          {totalDays} day contract
-        </span>
-        {!isCompleted && (
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-medium
-            ${isOverdue
-              ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800"
-              : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800"
-            }`}>
-            {isOverdue ? <Ban size={11} /> : <Clock size={11} />}
-            {isOverdue
-              ? `${overdueByDays}d overdue`
-              : `${remainingDays}d remaining`}
-          </span>
-        )}
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border text-muted-foreground">
-          <TrendingUp size={11} />
-          {Math.min(100, Math.round((elapsedDays / totalDays) * 100))}% elapsed
-        </span>
-        {isCompleted && actual && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800 border font-medium">
-            <CheckCircle2 size={11} />
-            Done {daysBetween(actual, intended) >= 0
-              ? `${daysBetween(actual, intended)}d early`
-              : `${Math.abs(daysBetween(actual, intended))}d late`}
-          </span>
-        )}
-      </div>
-
-      {/* ── Timeline ── */}
-      {/*
-        Layout (px from top of the outer div):
-          0 – 20px  : "Today" label + tick (top lane, above bar)
-          20px       : bar track (h-3)
-          23px+      : bottom marker ticks + staggered label lanes
-        Total reserved height = top-area (28px) + bar (12px) + bottom lanes (80px) = ~120px
-      */}
-      <div className="relative select-none" style={{ height: "120px" }}>
-
-        {/* Today label above bar */}
-        {!isCompleted && nowPct > 0 && nowPct < 100 && (
-          <div
-            className="absolute"
-            style={{ left: `${nowPct}%`, top: 0 }}
-          >
-            {/* label */}
-            <div
-              className="absolute bottom-0 whitespace-nowrap text-[10px] leading-tight"
-              style={{
-                transform: nowPct > 78 ? "translateX(-100%)"
-                         : nowPct < 22 ? "translateX(0)"
-                         : "translateX(-50%)",
-              }}
-            >
-              <span className="font-bold text-foreground block">Today</span>
-              <span className="text-muted-foreground/80">{formatBsDate(now.toISOString())}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Bar track — positioned 28px from top */}
-        <div
-          className="absolute left-0 right-0 h-3 rounded-full bg-muted border overflow-visible"
-          style={{ top: "28px" }}
-        >
-          {/* Progress fill */}
-          <div
-            className={`absolute top-0 h-full rounded-full ${barColor} opacity-85`}
-            style={{ left: `${startPct}%`, width: `${Math.max(0, progressFillPct)}%` }}
-          />
-
-          {/* Overdue extension */}
-          {isOverdue && (
-            <div
-              className="absolute top-0 h-full rounded-r-full bg-red-400/25 border-r-2 border-dashed border-red-500"
-              style={{ left: `${intendedPct}%`, width: `${Math.max(0, nowPct - intendedPct)}%` }}
-            />
-          )}
-
-          {/* Today dashed vertical line through bar */}
-          {!isCompleted && nowPct > 0 && nowPct < 100 && (
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-0.5 bg-foreground rounded-full shadow"
-              style={{ left: `${nowPct}%`, height: "20px", marginLeft: "-1px" }}
-            />
-          )}
-
-          {/* ── Bottom markers (dots only, labels rendered outside) ── */}
-          {bottomMarkers.map((m, i) => (
-            <div
-              key={i}
-              className="absolute top-1/2 -translate-y-1/2"
-              style={{ left: `${m.pct}%` }}
-            >
-              {m.diamond ? (
-                <span
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 ${m.color} rotate-45 rounded-sm border-2 border-background shadow-md`}
-                  style={{ top: "50%" }}
-                />
-              ) : (
-                <span
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 ${m.color} rounded-full border-2 border-background shadow-md`}
-                  style={{ top: "50%" }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Staggered labels below bar ── */}
-        {bottomMarkers.map((m, i) => {
-          const laneY  = LANE_Y[lanes[i]];   // px below top of outer div
-          const tickH  = laneY - 4;           // tick connects dot bottom → label
-
-          // Clamp horizontal alignment so labels don't overflow left/right edges
-          const align: "left" | "center" | "right" =
-            m.pct < 18 ? "left" : m.pct > 82 ? "right" : "center";
-
-          return (
-            <div key={i} className="absolute" style={{ left: `${m.pct}%`, top: "28px" }}>
-              {/* Tick from dot to label */}
-              <div
-                className="absolute left-1/2 -translate-x-px w-px bg-muted-foreground/25"
-                style={{ top: "12px", height: `${tickH}px` }}
-              />
-              {/* Label */}
-              <div
-                className="absolute whitespace-nowrap text-[10px] leading-tight"
-                style={{
-                  top: `${laneY + 12}px`,
-                  ...(align === "center"
-                    ? { transform: "translateX(-50%)" }
-                    : align === "right"
-                    ? { transform: "translateX(-100%)" }
-                    : {}),
-                }}
-              >
-                <span className="font-semibold text-muted-foreground block">{m.sublabel}</span>
-                <span className="text-muted-foreground/65">{m.label}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground border-t pt-3">
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-500" />Start</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary" />Progress</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-foreground border border-background" />Today</span>
-        {actual && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-green-500 rotate-45 inline-block" />Actual End</span>}
-        {isOverdue && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" />Overdue</span>}
-      </div>
-    </div>
-  );
-}
-
-// TimelineMarker is now inlined inside ContractTimeline for stagger control.
-
-// ─── Info Row ─────────────────────────────────────────────────────────────────
-
-function InfoRow({ label, value, accent }: {
-  label: string; value?: React.ReactNode; accent?: boolean;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-2.5 border-b last:border-0">
-      <span className="text-sm text-muted-foreground shrink-0">{label}</span>
-      <div className={`text-sm font-medium text-right ${accent ? "text-primary" : ""}`}>
-        {value ?? "—"}
-      </div>
-    </div>
-  );
-}
-
-function AmountFigureCard({
-  label,
-  value,
-  tone = "neutral",
-}: {
-  label: string;
-  value: React.ReactNode;
-  tone?: "neutral" | "primary" | "success";
-}) {
-  const toneClass = {
-    neutral: "border-slate-200 bg-card",
-    primary: "border-primary/25 bg-primary/5",
-    success: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20",
-  }[tone];
-
-  const valueClass = {
+  const toneCls = {
     neutral: "text-foreground",
-    primary: "text-primary",
-    success: "text-emerald-700 dark:text-emerald-300",
+    good: "text-emerald-700 dark:text-emerald-400",
+    bad: "text-red-600 dark:text-red-400",
   }[tone];
-
   return (
-    <div className={`rounded-xl border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <span aria-hidden="true">{icon}</span>{label}
       </p>
-      <div className={`mt-2 text-xl font-bold ${valueClass}`}>
-        {value}
-      </div>
+      <p className={`mt-1.5 text-xl font-bold tabular-nums ${toneCls}`}>{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
-function FinalEvaluatedAmountControl({
-  amount,
-  canEdit,
-  contractId,
-}: {
-  amount?: number | null;
-  canEdit: boolean;
-  contractId: string;
+function Empty({ children }: { children: React.ReactNode }) {
+  return <span className="text-xs italic text-muted-foreground">{children}</span>;
+}
+
+function FinalEvaluatedAmountControl({ amount, canEdit, contractId }: {
+  amount?: number | null; canEdit: boolean; contractId: string;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(() =>
-    amount != null ? String(Number(amount)) : ""
-  );
+  const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const { mutateAsync: updateContract, isPending } = useUpdateContract();
 
-  const handleCancel = () => {
-    setValue(amount != null ? String(Number(amount)) : "");
-    setError(null);
-    setIsEditing(false);
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-
-    const nextAmount = Number(value);
-    if (!value.trim() || Number.isNaN(nextAmount) || nextAmount <= 0) {
-      setError("Enter a valid amount.");
-      return;
-    }
-
-    try {
-      await updateContract({
-        id: contractId,
-        data: { finalEvaluatedAmount: nextAmount },
-      });
-      setIsEditing(false);
-    } catch {
-      setError("Could not update amount.");
-    }
-  };
-
-  if (!canEdit) {
-    return amount != null
-      ? formatCurrency(amount)
-      : <span className="text-muted-foreground italic text-xs">Not recorded yet</span>;
-  }
+  const display = amount != null ? formatContractCurrency(amount) : <Empty>Not recorded yet</Empty>;
+  if (!canEdit) return <>{display}</>;
 
   if (!isEditing) {
     return (
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <span>
-          {amount != null
-            ? formatCurrency(amount)
-            : <span className="text-muted-foreground italic text-xs">Not recorded yet</span>}
-        </span>
+      <span className="inline-flex flex-wrap items-center gap-2 sm:justify-end">
+        {display}
         <button
           type="button"
-          onClick={() => {
-            setValue(amount != null ? String(Number(amount)) : "");
-            setError(null);
-            setIsEditing(true);
-          }}
-          className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+          onClick={() => { setValue(amount != null ? String(Number(amount)) : ""); setError(null); setIsEditing(true); }}
+          className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
         >
-          <Pencil size={12} />
-          Correct
+          <Pencil size={12} aria-hidden="true" />Correct
         </button>
-      </div>
+      </span>
     );
   }
 
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const next = Number(value);
+    if (!value.trim() || Number.isNaN(next) || next <= 0) { setError("Enter a valid amount."); return; }
+    setError(null);
+    try {
+      await updateContract({ id: contractId, data: { finalEvaluatedAmount: next } });
+      setIsEditing(false);
+    } catch (e) {
+      // The hook already toasts the backend message; keep the form open and say so inline.
+      setError(e instanceof Error && e.message ? e.message : "Could not update amount.");
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-2">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <form onSubmit={submit} className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
         <input
-          type="number"
-          min="1"
-          step="0.01"
-          aria-label="Final evaluated amount"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          disabled={isPending}
-          className="w-36 rounded-md border bg-background px-2 py-1 text-right font-mono text-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+          type="number" min="1" step="0.01" autoFocus aria-label="Final evaluated amount"
+          value={value} onChange={(e) => setValue(e.target.value)} disabled={isPending}
+          className="w-36 rounded-md border bg-background px-2 py-1 text-right font-mono text-sm outline-none focus:border-primary disabled:opacity-60"
         />
-        <button
-          type="submit"
-          disabled={isPending}
-          className="inline-flex items-center gap-1 rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-          Save
-        </button>
-        <button
-          type="button"
-          onClick={handleCancel}
-          disabled={isPending}
-          className="rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <Button type="submit" size="sm" disabled={isPending}>
+          {isPending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}Save
+        </Button>
+        <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => setIsEditing(false)}>
           Cancel
-        </button>
+        </Button>
       </div>
-      {error && <p className="text-xs font-medium text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-xs font-medium text-destructive">{error}</p>}
     </form>
-  );
-}
-
-// ─── Section ──────────────────────────────────────────────────────────────────
-
-function Section({ title, icon, children, collapsible = false }: {
-  title: string; icon?: React.ReactNode; children: React.ReactNode; collapsible?: boolean;
-}) {
-  const [open, setOpen] = useState(true);
-  return (
-    <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={() => collapsible && setOpen((p) => !p)}
-        className={`w-full flex items-center justify-between px-5 py-3.5 border-b bg-muted/20 ${collapsible ? "cursor-pointer hover:bg-muted/40 transition-colors" : "cursor-default"}`}
-      >
-        <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-          {icon && <span className="text-primary">{icon}</span>}
-          {title}
-        </h2>
-        {collapsible && (
-          <ChevronDown size={15} className={`text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-        )}
-      </button>
-      {(!collapsible || open) && <div className="px-5 py-4">{children}</div>}
-    </div>
-  );
-}
-
-function DocumentActionCard({
-  accent,
-  available,
-  detail,
-  icon,
-  meta,
-  onOpen,
-  onPrint,
-  title,
-}: {
-  accent: "blue" | "violet" | "emerald";
-  available: boolean;
-  detail: string;
-  icon: React.ReactNode;
-  meta: string;
-  onOpen?: () => void;
-  onPrint?: () => void;
-  title: string;
-}) {
-  const accentCls = {
-    blue: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
-    violet: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  }[accent];
-
-  return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${accentCls}`}>
-          {icon}
-        </div>
-        <span
-          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-            available
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
-              : "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-          }`}
-        >
-          {available ? "Ready" : "Not Attached"}
-        </span>
-      </div>
-
-      <div className="mt-4 space-y-1.5">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground">{detail}</p>
-        <p className="text-xs font-medium text-muted-foreground">{meta}</p>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onOpen}
-          disabled={!available || !onOpen}
-          className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {icon}
-          Open
-        </button>
-        <button
-          type="button"
-          onClick={onPrint}
-          disabled={!available || !onPrint}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Printer size={14} />
-          Print
-        </button>
-      </div>
-    </div>
   );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-function DocumentTextBlock({
-  text,
-  title,
-}: {
-  text: string;
-  title: string;
-}) {
-  return (
-    <div className="mt-3 space-y-1.5 rounded-lg border bg-muted/30 p-3">
-      <p className="text-xs font-medium text-muted-foreground">{title}</p>
-      <p className="text-sm leading-relaxed text-foreground/90">{text}</p>
-    </div>
-  );
-}
-
 export default function ContractDetailPage() {
-  const router  = useRouter();
-  const { id }  = useParams();
-  const [localStatus, setLocalStatus] = useState<ContractStatus | undefined>(undefined);
+  const router = useRouter();
+  const { id } = useParams();
+  const contractId = id as string;
   const { isAdmin } = useRole();
-  const { mutate: approveContract, isPending: isApprovingContract } = useApproveContract();
 
-  const { data: contract, isLoading, error } = useContract(id as string);
-  const { data: project } = useProject(contract?.projectId ?? "");
+  const { mutate: approveContract, isPending: isApproving } = useApproveContract();
+  const { mutate: updateContract, isPending: isUpdating } = useUpdateContract();
+  const { data: contract, isLoading, error, refetch, isFetching } = useContract(contractId);
+  const { data: project, isLoading: projectLoading } = useProject(contract?.projectId ?? "");
+
+  const [confirm, setConfirm] = useState<"approve" | "advance" | "archive" | null>(null);
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto space-y-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />
-        ))}
+      <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6" aria-busy="true">
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-10 w-2/3" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
+          <div className="space-y-5">
+            <Skeleton className="h-32 rounded-xl" /><Skeleton className="h-56 rounded-xl" />
+          </div>
+          <Skeleton className="h-72 rounded-xl" />
+        </div>
       </div>
     );
   }
 
   if (error || !contract) {
+    const notFound = (error as { response?: { status?: number } } | null)?.response?.status === 404;
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="flex items-center gap-3 p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-destructive">
+      <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+        <div role="alert" className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
           <AlertTriangle size={18} />
-          <span className="text-sm font-medium">Failed to load contract. Please try again.</span>
+          <span className="text-sm font-medium">
+            {notFound ? "This contract does not exist or was removed." : "Failed to load contract."}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          {!notFound && (
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />Retry
+            </Button>
+          )}
+          <Button variant="outline" asChild><Link href="/dashboard/contracts">Back to contracts</Link></Button>
         </div>
       </div>
     );
   }
 
-  const displayStatus = (localStatus ?? contract.status) as ContractStatus;
-  const isCompleted = displayStatus === "COMPLETED";
-  const health        = getTimeHealth({ ...contract, status: displayStatus });
-  const openDocumentPrint = (path: string) => {
-    window.open(`${path}?print=1`, "_blank", "noopener,noreferrer");
-  };
-  const documentVariant = getContractDocumentVariant(contract);
-  const documentPartyLabel = getDocumentPartyLabel(documentVariant);
-  const agreementDraftText = buildAgreementDraftFromContract(contract);
-  const workOrderDraftText = buildWorkOrderDraftFromContract(contract);
-  const agreementHasCustomText = contract.agreement
-    ? hasCustomDocumentText(contract.agreement.content, agreementDraftText)
-    : false;
-  const workOrderHasCustomText = contract.workOrder
-    ? hasCustomDocumentText(contract.workOrder.content, workOrderDraftText)
-    : false;
+  // ── Derived state ──
+  const status = contract.status as ContractStatus;
+  const isCompleted = status === "COMPLETED";
+  const isArchived = status === "ARCHIVED";
+  const isApproved = contract.approvalStatus === "APPROVED";
+  const health = getTimeHealth({ ...contract, status });
+  const isOverdue = health === "overdue";
+
+  const base = `/dashboard/contracts/${contractId}`;
+  const printDoc = (path: string) => window.open(`${path}?print=1`, "_blank", "noopener,noreferrer");
+
+  const variant = getContractDocumentVariant(contract);
+  const partyLabel = getDocumentPartyLabel(variant);
+  const contractorRole = getDocumentSignatoryLabel(variant);
+  const agreementDraft = buildAgreementDraftFromContract(contract);
+  const workOrderDraft = buildWorkOrderDraftFromContract(contract);
+  const agreementCustom = contract.agreement ? hasCustomDocumentText(contract.agreement.content, agreementDraft) : false;
+  const workOrderCustom = contract.workOrder ? hasCustomDocumentText(contract.workOrder.content, workOrderDraft) : false;
   const agreementAmount = contract.agreement?.amount ?? contract.contractAmount;
-  const workOrderCompletionDate =
-    contract.workOrder?.workCompletionDate ?? contract.intendedCompletionDate;
-  const allocatedAmount = project?.allocatedBudget;
-  const canCorrectFinalEvaluatedAmount = isAdmin && isCompleted;
-  const canUpdateStatus = isAdmin && contract.approvalStatus === "APPROVED";
-  const statusUpdateDisabledReason = !isAdmin
-    ? "Only admins can update contract status."
-    : contract.approvalStatus !== "APPROVED"
-      ? "Approve this contract before updating status."
-      : undefined;
+  const workOrderCompletion = contract.workOrder?.workCompletionDate ?? contract.intendedCompletionDate;
+
+  const allocated = project?.allocatedBudget;
+  const contractAmount = Number(contract.contractAmount);
+  const budgetPct = allocated && allocated > 0 && !Number.isNaN(contractAmount)
+    ? Math.round((contractAmount / allocated) * 100) : null;
+
+  const remainingDays = contract.intendedCompletionDate
+    ? daysBetween(new Date(), new Date(contract.intendedCompletionDate)) : null;
 
   const implementor = contract.company
-    ? { type: "company"   as const, name: contract.company.name, sub: contract.company.panNumber ? `PAN: ${contract.company.panNumber}` : undefined }
+    ? { type: "company" as const, name: contract.company.name, sub: contract.company.panNumber ? `PAN: ${contract.company.panNumber}` : undefined }
     : contract.userCommittee
-    ? { type: "committee" as const, name: contract.userCommittee.name, sub: "User Committee" }
+      ? { type: "committee" as const, name: contract.userCommittee.name, sub: "User Committee" }
+      : null;
+
+  const nextMilestone = getNextMilestone(status);
+  const canProgress = isAdmin && isApproved && !isArchived && nextMilestone !== null;
+  const progressBlockedReason = isArchived ? null
+    : !isAdmin ? "Only admins can move the contract to the next milestone."
+    : !isApproved ? "Approve this contract before changing its milestone."
     : null;
 
+  const handleAdvance = () => {
+    if (!nextMilestone) return;
+    if (nextMilestone === "COMPLETED") { router.push(`${base}/contract-update`); return; }
+    setConfirm("advance");
+  };
+  const runStatusUpdate = (next: ContractStatus) =>
+    updateContract({ id: contractId, data: { status: next } }, { onSuccess: () => setConfirm(null) });
+
+  // One state-driven primary action; everything else goes in the "More" menu.
+  const primary: { label: string; icon: React.ReactNode; onClick: () => void; pending?: boolean } | null =
+    !isApproved && isAdmin
+      ? { label: "Approve contract", icon: <CheckCircle2 size={14} />, onClick: () => setConfirm("approve"), pending: isApproving }
+      : isApproved && !isCompleted && !isArchived
+        ? { label: "Record completion", icon: <CheckSquare size={14} />, onClick: () => router.push(`${base}/contract-update`) }
+        : isCompleted && contract.completionCode
+          ? { label: "Payment form", icon: <ReceiptText size={14} />, onClick: () => router.push(`${base}/payment-form`) }
+          : null;
+
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-5 pb-16">
+    <div className="mx-auto max-w-6xl space-y-5 p-4 pb-16 sm:p-6">
+      <Breadcrumbs items={[
+        { label: "Contracts", href: "/dashboard/contracts" },
+        { label: contract.contractNumber },
+      ]} />
 
       {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground mt-0.5"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold tracking-tight">Contract Details</h1>
-              <StatusBadge status={displayStatus} />
-              <ApprovalStatusBadge status={contract.approvalStatus} />
-              <TimeHealthBadge health={health} />
-            </div>
-            <p className="text-sm text-muted-foreground font-mono mt-0.5">
-              {contract.contractNumber}
-            </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contract</p>
+          <h1 className="mt-0.5 wrap-break-word text-xl font-bold tracking-tight sm:text-2xl">
+            {contract.project?.name ?? contract.contractNumber}
+          </h1>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+            <span className="font-mono">{contract.contractNumber}</span>
+            {implementor && <><span aria-hidden="true">·</span><span>{implementor.name}</span></>}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <StatusBadge status={status} />
+            <ApprovalStatusBadge status={contract.approvalStatus} />
+            {isOverdue && remainingDays !== null && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-400">
+                <AlertTriangle size={12} aria-hidden="true" />Overdue by {Math.abs(remainingDays)}d
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => router.push(`/dashboard/contracts/${id}/agreement`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
-          >
-            <FileText size={13} />
-            Agreement Page
-          </button>
-          <button
-            onClick={() => router.push(`/dashboard/contracts/${id}/work-order`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
-          >
-            <ClipboardList size={13} />
-            Work-Order Page
-          </button>
-          {(!isCompleted || isAdmin) && (
-            <button
-              onClick={() => router.push(`/dashboard/contracts/${id}/contract-update`)}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
-            >
-              {isCompleted ? <Pencil size={13} /> : <CheckSquare size={13} />}
-              {isCompleted ? "Edit Final Amount" : "Contract Update"}
-            </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {primary && (
+            <Button onClick={primary.onClick} disabled={primary.pending}>
+              {primary.pending ? <Loader2 size={14} className="animate-spin" /> : primary.icon}
+              {primary.label}
+            </Button>
           )}
-          {isCompleted && contract.completionCode && (
-            <button
-              onClick={() => router.push(`/dashboard/contracts/${id}/payment-form`)}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
-            >
-              <ReceiptText size={13} />
-              Payment Form
-            </button>
-          )}
-          <StatusUpdater
-            currentStatus={displayStatus}
-            contractId={id as string}
-            canUpdateStatus={canUpdateStatus}
-            disabledReason={statusUpdateDisabledReason}
-            onUpdated={setLocalStatus}
-          />
-          <button
-            onClick={() => router.push(`/dashboard/contracts/${id}/edit`)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-background text-sm font-medium hover:bg-muted transition-colors"
-          >
-            <Edit size={13} />
-            Edit
-          </button>
+          <Button variant="outline" onClick={() => router.push(`${base}/edit`)}>
+            <Edit size={14} />Edit
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="More actions">
+                <MoreHorizontal size={16} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onSelect={() => router.push(`${base}/agreement`)}>
+                <FileText size={14} />Agreement document
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push(`${base}/work-order`)}>
+                <ClipboardList size={14} />Work order document
+              </DropdownMenuItem>
+              {isCompleted && contract.completionCode && (
+                <DropdownMenuItem onSelect={() => router.push(`${base}/payment-form`)}>
+                  <ReceiptText size={14} />Payment form
+                </DropdownMenuItem>
+              )}
+              {(isApproved || isAdmin) && (!isCompleted || isAdmin) && (
+                <DropdownMenuItem onSelect={() => router.push(`${base}/contract-update`)}>
+                  <CheckSquare size={14} />{isCompleted ? "Edit completion details" : "Contract update"}
+                </DropdownMenuItem>
+              )}
+              {isAdmin && isApproved && !isArchived && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onSelect={() => setConfirm("archive")}>
+                    <Archive size={14} />Archive contract
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {isCompleted && (
-        <div className="grid gap-3 md:grid-cols-3">
-          <AmountFigureCard
-            label="Allocated Amount"
-            value={allocatedAmount != null ? formatCurrency(allocatedAmount) : "—"}
-          />
-          <AmountFigureCard
-            label="Contract Amount"
-            tone="primary"
-            value={formatCurrency(contract.contractAmount)}
-          />
-          <AmountFigureCard
-            label="Final Evaluated Amount"
-            tone="success"
-            value={
-              contract.finalEvaluatedAmount != null
-                ? formatCurrency(contract.finalEvaluatedAmount)
-                : "Not recorded"
-            }
-          />
+      {/* ── Approval banner (blocking, so it sits at the top) ── */}
+      {!isApproved && (
+        <div role="status" className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <div className="text-sm">
+              <p className="font-semibold">
+                {contract.approvalStatus === "REJECTED" ? "This contract was rejected" : "Awaiting admin approval"}
+              </p>
+              <p className="opacity-80">
+                Milestone changes and completion are locked until an admin approves this contract.
+              </p>
+            </div>
+          </div>
+          {isAdmin && (
+            <Button onClick={() => setConfirm("approve")} disabled={isApproving} className="shrink-0">
+              {isApproving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+              Approve
+            </Button>
+          )}
         </div>
       )}
 
-      {/* ── Timeline ── */}
-      <Section title="Project Timeline" icon={<CalendarDays size={16} />}>
-        <ContractTimeline contract={contract} />
-      </Section>
+      {/* ── KPIs ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi icon={<Wallet size={13} />} label="Contract amount" value={formatContractCurrency(contract.contractAmount)}
+          hint={budgetPct !== null ? `${budgetPct}% of project budget` : projectLoading ? "Loading budget…" : undefined} />
+        <Kpi icon={<Wallet size={13} />} label="Project budget"
+          value={allocated != null ? formatContractCurrency(allocated) : projectLoading ? "…" : "—"} />
+        <Kpi icon={<CalendarDays size={13} />}
+          label={isCompleted ? "Completed" : isOverdue ? "Overdue" : "Time left"}
+          tone={isOverdue ? "bad" : isCompleted ? "good" : "neutral"}
+          value={isCompleted
+            ? formatBsDate(contract.actualCompletionDate)
+            : remainingDays === null ? "—"
+            : isOverdue ? `${Math.abs(remainingDays)} days` : `${Math.max(0, remainingDays)} days`}
+          hint={`Due ${formatBsDate(contract.intendedCompletionDate)}`} />
+        <Kpi icon={<CheckCircle2 size={13} />} label="Final evaluated amount"
+          tone={contract.finalEvaluatedAmount != null ? "good" : "neutral"}
+          value={contract.finalEvaluatedAmount != null ? formatContractCurrency(contract.finalEvaluatedAmount) : "—"}
+          hint={contract.finalEvaluatedAmount != null ? undefined : "Recorded on completion"} />
+      </div>
 
-      {/* ── General Details ── */}
-      <Section title="General Details" icon={<Hash size={16} />}>
-        <InfoRow label="Contract Number" value={
-          <span className="font-mono">{contract.contractNumber}</span>
-        } accent />
-        <InfoRow label="Contract Amount" value={formatCurrency(contract.contractAmount)} accent />
-        <InfoRow
-          label="Final Evaluated Amount"
-          value={
-            <FinalEvaluatedAmountControl
-              amount={contract.finalEvaluatedAmount}
-              canEdit={canCorrectFinalEvaluatedAmount}
-              contractId={contract.id}
-            />
-          }
-        />
-        <InfoRow label="Start Date (BS)" value={formatBsDate(contract.startDate)} />
-        <InfoRow
-          label="Intended Completion (BS)"
-          value={
-            <span className={health === "overdue" ? "text-red-600 dark:text-red-400 font-semibold" : ""}>
-              {formatBsDate(contract.intendedCompletionDate)}
-              {health === "overdue" && (
-                <span className="ml-1.5 text-xs font-normal opacity-80">
-                  (overdue by {Math.abs(daysBetween(new Date(), new Date(contract.intendedCompletionDate!)))}d)
-                </span>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* ── Main column ── */}
+        <div className="space-y-5">
+          <Card
+            title="Progress"
+            icon={<CalendarDays size={16} />}
+            action={canProgress && nextMilestone ? (
+              <Button size="sm" onClick={handleAdvance} disabled={isUpdating}>
+                {isUpdating ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
+                {nextMilestone === "COMPLETED" ? "Complete contract" : `Move to ${STATUS_CONFIG[nextMilestone].label}`}
+              </Button>
+            ) : undefined}
+          >
+            <div className="space-y-5">
+              <StatusStepper status={status} />
+              {progressBlockedReason && !isCompleted && (
+                <p className="text-xs text-muted-foreground">{progressBlockedReason}</p>
               )}
-            </span>
-          }
-        />
-        <InfoRow
-          label="Actual Completion (BS)"
-          value={
-            contract.actualCompletionDate
-              ? <span className="text-green-600 dark:text-green-400">{formatBsDate(contract.actualCompletionDate)}</span>
-              : <span className="text-muted-foreground italic text-xs">Not yet completed</span>
-          }
-        />
-        <InfoRow
-          label="Completion Code"
-          value={
-            contract.completionCode
-              ? <span className="font-mono text-emerald-700 dark:text-emerald-400">{contract.completionCode}</span>
-              : <span className="text-muted-foreground italic text-xs">Will generate after contract update</span>
-          }
-        />
-        {contract.remarks && (
-          <InfoRow label="Remarks" value={
-            <span className="max-w-xs text-right leading-snug">{contract.remarks}</span>
-          } />
-        )}
-      </Section>
-
-      {/* ── Project ── */}
-      <Section title="Approval" icon={<BadgeCheck size={16} />}>
-        <InfoRow
-          label="Approval Status"
-          value={<ApprovalStatusBadge status={contract.approvalStatus} />}
-        />
-        <InfoRow
-          label="Approved At"
-          value={
-            contract.approvedAt
-              ? formatBsDate(contract.approvedAt)
-              : <span className="text-muted-foreground italic text-xs">Not approved yet</span>
-          }
-        />
-        <InfoRow
-          label="Submitted By"
-          value={
-            contract.initiatedBy ? (
-              <span className="inline-flex items-center justify-end gap-1.5">
-                <User size={12} className="text-muted-foreground" />
-                {formatUserName(contract.initiatedBy)}
-                {contract.initiatedBy.email && contract.initiatedBy.name && (
-                  <span className="text-xs text-muted-foreground font-normal">
-                    · {contract.initiatedBy.email}
-                  </span>
-                )}
-              </span>
-            ) : contract.initiatedById ? (
-              <span className="font-mono text-xs">{contract.initiatedById}</span>
-            ) : (
-              <span className="text-muted-foreground italic text-xs">Not recorded</span>
-            )
-          }
-        />
-        {isAdmin && (
-          <div className="mt-3 border-t pt-3">
-            {contract.approvalStatus !== "APPROVED" ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => approveContract(contract.id)}
-                  disabled={isApprovingContract}
-                  className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-60"
-                >
-                  {isApprovingContract ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={14} />
-                  )}
-                  Approve Contract
-                </button>
-                <p className="text-xs text-muted-foreground">
-                  Approve this contract to unlock admin milestone and status progression.
-                </p>
+              <div className="border-t pt-4">
+                <ContractTimeline contract={contract} />
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                This contract has already been approved.
-              </p>
-            )}
-          </div>
-        )}
-      </Section>
-
-      {contract.project && (
-        <Section title="Project" icon={<FileText size={16} />}>
-          <InfoRow label="Name" value={contract.project.name} />
-          {contract.project.sNo && <InfoRow label="S.No." value={contract.project.sNo} />}
-        </Section>
-      )}
-
-      {/* ── Implementation ── */}
-      {implementor && (
-        <Section
-          title="Implementation"
-          icon={implementor.type === "company" ? <Building2 size={16} /> : <Users size={16} />}
-        >
-          <InfoRow label="Document Format" value={documentPartyLabel} />
-          <div className="flex items-center gap-3 py-1">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0
-              ${implementor.type === "company"
-                ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400"
-                : "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
-              }`}
-            >
-              {implementor.type === "company" ? <Building2 size={16} /> : <Users size={16} />}
             </div>
-            <div>
-              <p className="text-sm font-semibold">{implementor.name}</p>
-              {implementor.sub && (
-                <p className="text-xs text-muted-foreground">{implementor.sub}</p>
-              )}
-            </div>
-          </div>
-          {contract.user && (
-            <div className="mt-3 pt-3 border-t">
+          </Card>
+
+          <Card title="Contract details" icon={<Hash size={16} />}>
+            <dl>
+              <InfoRow label="Contract number" accent value={<span className="font-mono">{contract.contractNumber}</span>} />
+              <InfoRow label="Contract amount" accent value={<span className="tabular-nums">{formatContractCurrency(contract.contractAmount)}</span>} />
               <InfoRow
-                label="Site Incharge"
-                value={
-                  <span className="flex items-center gap-1.5">
-                    <User size={12} className="text-muted-foreground" />
-                    {contract.user.name ?? "—"}
-                    {contract.user.designation && (
-                      <span className="text-xs text-muted-foreground font-normal">
-                        · {contract.user.designation}
-                      </span>
+                label="Final evaluated amount"
+                value={<FinalEvaluatedAmountControl amount={contract.finalEvaluatedAmount}
+                  canEdit={isAdmin && isCompleted} contractId={contract.id} />}
+              />
+              <InfoRow label="Start date (BS)" value={formatBsDate(contract.startDate)} />
+              <InfoRow label="Intended completion (BS)" value={
+                <span className={isOverdue ? "font-semibold text-red-600 dark:text-red-400" : ""}>
+                  {formatBsDate(contract.intendedCompletionDate)}
+                </span>
+              } />
+              <InfoRow label="Actual completion (BS)" value={
+                contract.actualCompletionDate
+                  ? <span className="text-green-600 dark:text-green-400">{formatBsDate(contract.actualCompletionDate)}</span>
+                  : <Empty>Not yet completed</Empty>
+              } />
+              <InfoRow label="Completion code" value={
+                contract.completionCode
+                  ? <span className="font-mono text-emerald-700 dark:text-emerald-400">{contract.completionCode}</span>
+                  : isApproved && !isArchived
+                    ? <Link href={`${base}/contract-update`} className="text-xs text-primary underline-offset-2 hover:underline">
+                        Generated after contract update →
+                      </Link>
+                    : <Empty>Not generated</Empty>
+              } />
+            </dl>
+            {contract.remarks && (
+              <div className="mt-3 border-t pt-3">
+                <p className="text-sm text-muted-foreground">Remarks</p>
+                <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">{contract.remarks}</p>
+              </div>
+            )}
+          </Card>
+
+          <Card title="Documents" icon={<CheckSquare size={16} />}>
+            <div className="space-y-4">
+              <DocumentPanel
+                accent="blue"
+                icon={<FileText size={18} />}
+                title="Agreement"
+                badge={contract.agreement
+                  ? { label: agreementCustom ? "Custom terms" : "Recorded", tone: agreementCustom ? "custom" : "ready" }
+                  : { label: "Auto-generated", tone: "muted" }}
+                summary={`${partyLabel} agreement, generated from the live contract details.`}
+                meta={`Date ${formatBsDate(contract.agreement?.agreementDate ?? contract.startDate)} · ${formatContractCurrency(agreementAmount)}`}
+                onOpen={() => router.push(`${base}/agreement`)}
+                onPrint={() => printDoc(`${base}/agreement`)}
+                printedText={agreementDraft}
+                recordedLabel="Recorded terms"
+                recordedText={agreementCustom ? contract.agreement?.content : null}
+                signatories={[
+                  { role: "Office signatory", name: contract.agreement?.officeSignatory },
+                  { role: contractorRole, name: contract.agreement?.contractorSignatory },
+                  { role: "Witness", name: contract.agreement?.witnessName },
+                ]}
+                signatoriesEmptyHint="No signatories recorded. Add them from Open → agreement page."
+              />
+              <DocumentPanel
+                accent="violet"
+                icon={<ClipboardList size={18} />}
+                title="Work order"
+                badge={contract.workOrder
+                  ? { label: workOrderCustom ? "Custom scope" : "Recorded", tone: workOrderCustom ? "custom" : "ready" }
+                  : { label: "Auto-generated", tone: "muted" }}
+                summary={`${partyLabel} work order, generated from the live contract details.`}
+                meta={`Completion target ${formatBsDate(workOrderCompletion)}`}
+                onOpen={() => router.push(`${base}/work-order`)}
+                onPrint={() => printDoc(`${base}/work-order`)}
+                printedText={workOrderDraft}
+                recordedLabel="Recorded scope"
+                recordedText={workOrderCustom ? contract.workOrder?.content : null}
+                signatories={[
+                  { role: "Office signatory", name: contract.workOrder?.officeSignatory },
+                  { role: contractorRole, name: contract.workOrder?.contractorSignatory },
+                  { role: "Witness", name: contract.workOrder?.witnessName },
+                ]}
+                signatoriesEmptyHint="No signatories recorded. Add them from Open → work order page."
+              />
+              <DocumentPanel
+                accent="emerald"
+                icon={<ReceiptText size={18} />}
+                title="Payment recommendation"
+                badge={isCompleted && contract.completionCode
+                  ? { label: "Ready", tone: "ready" } : { label: "Not available yet", tone: "muted" }}
+                summary="Ma. Le. Pa. Form 202 payment recommendation."
+                meta={`Completion code: ${contract.completionCode ?? "not generated"}`}
+                onOpen={() => router.push(`${base}/payment-form`)}
+                onPrint={() => printDoc(`${base}/payment-form`)}
+                disabledReason={isCompleted && contract.completionCode
+                  ? undefined : "Available once the contract is completed and a completion code is generated."}
+              />
+            </div>
+          </Card>
+        </div>
+
+        {/* ── Side column ── */}
+        <aside className="space-y-5 lg:sticky lg:top-4">
+          <Card title="Approval" icon={<CheckCircle2 size={16} />}>
+            <dl>
+              <InfoRow label="Status" value={<ApprovalStatusBadge status={contract.approvalStatus} />} />
+              <InfoRow label="Approved" value={contract.approvedAt ? formatBsDate(contract.approvedAt) : <Empty>Not approved yet</Empty>} />
+              <InfoRow label="Submitted by" value={
+                contract.initiatedBy ? (
+                  <span className="flex min-w-0 flex-col sm:items-end">
+                    <span className="inline-flex items-center gap-1.5">
+                      <User size={12} className="text-muted-foreground" aria-hidden="true" />
+                      {formatUserName(contract.initiatedBy)}
+                    </span>
+                    {contract.initiatedBy.email && contract.initiatedBy.name && (
+                      <span className="break-all text-xs font-normal text-muted-foreground">{contract.initiatedBy.email}</span>
                     )}
                   </span>
-                }
-              />
-            </div>
+                ) : contract.initiatedById ? (
+                  <span className="break-all font-mono text-xs">{contract.initiatedById}</span>
+                ) : <Empty>Not recorded</Empty>
+              } />
+            </dl>
+          </Card>
+
+          {contract.project && (
+            <Card title="Project" icon={<FileText size={16} />}>
+              <dl>
+                <InfoRow label="Name" value={
+                  <Link href={`/dashboard/projects/${contract.projectId}`} className="text-primary underline-offset-2 hover:underline">
+                    {contract.project.name}
+                  </Link>
+                } />
+                {contract.project.sNo && <InfoRow label="S.No." value={contract.project.sNo} />}
+              </dl>
+            </Card>
           )}
-        </Section>
-      )}
 
-      <Section title="Documents" icon={<CheckSquare size={16} />}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <DocumentActionCard
-            accent="blue"
-            available
-            detail={`${documentPartyLabel} agreement page is generated directly from the live contract details and is ready to open or print.`}
-            icon={<FileText size={18} />}
-            meta={`${agreementHasCustomText ? "Custom recorded terms" : "Auto-generated terms"} | Amount: ${formatContractCurrency(agreementAmount)}`}
-            onOpen={() => router.push(`/dashboard/contracts/${id}/agreement`)}
-            onPrint={() => openDocumentPrint(`/dashboard/contracts/${id}/agreement`)}
-            title="Agreement Document"
-          />
-
-          <DocumentActionCard
-            accent="violet"
-            available
-            detail={`${documentPartyLabel} work-order page is generated directly from the live contract details and is ready to open, print, and share.`}
-            icon={<ClipboardList size={18} />}
-            meta={`${workOrderHasCustomText ? "Custom recorded scope" : "Auto-generated scope"} | Completion target: ${formatBsDate(workOrderCompletionDate)}`}
-            onOpen={() => router.push(`/dashboard/contracts/${id}/work-order`)}
-            onPrint={() => openDocumentPrint(`/dashboard/contracts/${id}/work-order`)}
-            title="Work Order Document"
-          />
-
-          <DocumentActionCard
-            accent="emerald"
-            available={isCompleted && Boolean(contract.completionCode)}
-            detail="Ma. Le. Pa. Form 202 payment recommendation page is available after project completion."
-            icon={<ReceiptText size={18} />}
-            meta={`Contract: ${contract.contractNumber} | Completion: ${contract.completionCode ?? "Not generated"}`}
-            onOpen={() => router.push(`/dashboard/contracts/${id}/payment-form`)}
-            onPrint={() => openDocumentPrint(`/dashboard/contracts/${id}/payment-form`)}
-            title="Payment Recommendation"
-          />
-        </div>
-      </Section>
-
-      {/* ── Agreement ── */}
-      <Section
-        title="Agreement"
-        icon={<ClipboardList size={16} />}
-        collapsible
-      >
-        <>
-            <InfoRow label="Agreement Date (BS)" value={formatBsDate(contract.agreement?.agreementDate ?? contract.startDate)} />
-            <InfoRow label="Amount" value={formatCurrency(agreementAmount)} accent />
-            <InfoRow
-              label="Text Source"
-              value={agreementHasCustomText ? "Custom recorded terms" : "Auto-generated from contract details"}
-            />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => router.push(`/dashboard/contracts/${id}/agreement`)}
-                className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
-              >
-                <FileText size={14} />
-                Open Agreement Page
-              </button>
-              <button
-                type="button"
-                onClick={() => openDocumentPrint(`/dashboard/contracts/${id}/agreement`)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-              >
-                <Printer size={14} />
-                Print Agreement
-              </button>
-            </div>
-            <div className="mt-3 border-t pt-3">
-              <DocumentTextBlock
-                title="Printable Summary"
-                text={agreementDraftText}
-              />
-              {agreementHasCustomText && contract.agreement && (
-                <DocumentTextBlock
-                  title="Recorded Terms"
-                  text={contract.agreement.content}
-                />
-              )}
-            </div>
-            {(contract.agreement?.officeSignatory || contract.agreement?.contractorSignatory || contract.agreement?.witnessName) && (
-              <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {contract.agreement?.officeSignatory && (
-                  <SignatoryCard role="Office Signatory" name={contract.agreement.officeSignatory} />
-                )}
-                {contract.agreement?.contractorSignatory && (
-                  <SignatoryCard
-                    role={getDocumentSignatoryLabel(documentVariant)}
-                    name={contract.agreement.contractorSignatory}
-                  />
-                )}
-                {contract.agreement?.witnessName && (
-                  <SignatoryCard role="Witness" name={contract.agreement.witnessName} />
-                )}
+          {implementor && (
+            <Card title="Implementation" icon={implementor.type === "company" ? <Building2 size={16} /> : <Users size={16} />}>
+              <div className="flex items-center gap-3">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                  implementor.type === "company"
+                    ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                    : "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"}`}>
+                  {implementor.type === "company" ? <Building2 size={16} /> : <Users size={16} />}
+                </div>
+                <div className="min-w-0">
+                  <p className="wrap-break-word text-sm font-semibold">{implementor.name}</p>
+                  {implementor.sub && <p className="text-xs text-muted-foreground">{implementor.sub}</p>}
+                </div>
               </div>
-            )}
-          </>
-      </Section>
+              <dl className="mt-3 border-t pt-1">
+                <InfoRow label="Document format" value={partyLabel} />
+                {contract.user && (
+                  <InfoRow label="Site incharge" value={
+                    <span className="flex flex-col sm:items-end">
+                      <span>{contract.user.name ?? "—"}</span>
+                      {contract.user.designation && (
+                        <span className="text-xs font-normal text-muted-foreground">{contract.user.designation}</span>
+                      )}
+                    </span>
+                  } />
+                )}
+              </dl>
+            </Card>
+          )}
 
-      {/* ── Work Order ── */}
-      <Section
-        title="Work Order"
-        icon={<CheckSquare size={16} />}
-        collapsible
-      >
-        <>
-            <InfoRow label="Work Completion Date (BS)" value={formatBsDate(workOrderCompletionDate)} />
-            <InfoRow
-              label="Text Source"
-              value={workOrderHasCustomText ? "Custom recorded scope" : "Auto-generated from contract details"}
-            />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => router.push(`/dashboard/contracts/${id}/work-order`)}
-                className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
-              >
-                <ClipboardList size={14} />
-                Open Work-Order Page
-              </button>
-              <button
-                type="button"
-                onClick={() => openDocumentPrint(`/dashboard/contracts/${id}/work-order`)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-              >
-                <Printer size={14} />
-                Print Work Order
-              </button>
-            </div>
-            <div className="mt-3 border-t pt-3">
-              <DocumentTextBlock
-                title="Printable Summary"
-                text={workOrderDraftText}
-              />
-              {workOrderHasCustomText && contract.workOrder && (
-                <DocumentTextBlock
-                  title="Recorded Scope"
-                  text={contract.workOrder.content}
-                />
-              )}
-            </div>
-            {(contract.workOrder?.officeSignatory || contract.workOrder?.contractorSignatory || contract.workOrder?.witnessName) && (
-              <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {contract.workOrder?.officeSignatory && (
-                  <SignatoryCard role="Office Signatory" name={contract.workOrder.officeSignatory} />
-                )}
-                {contract.workOrder?.contractorSignatory && (
-                  <SignatoryCard
-                    role={getDocumentSignatoryLabel(documentVariant)}
-                    name={contract.workOrder.contractorSignatory}
-                  />
-                )}
-                {contract.workOrder?.witnessName && (
-                  <SignatoryCard role="Witness" name={contract.workOrder.witnessName} />
-                )}
-              </div>
-            )}
-          </>
-      </Section>
-
-      {/* ── Metadata ── */}
-      <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground px-1">
-        <span>Created: {new Date(contract.createdAt).toLocaleString()}</span>
-        <span>Updated: {new Date(contract.updatedAt).toLocaleString()}</span>
+          <p className="px-1 text-xs text-muted-foreground">
+            <span title={new Date(contract.createdAt).toLocaleString()}>Created {formatRelativeTime(contract.createdAt)}</span>
+            {" · "}
+            <span title={new Date(contract.updatedAt).toLocaleString()}>Updated {formatRelativeTime(contract.updatedAt)}</span>
+          </p>
+        </aside>
       </div>
-    </div>
-  );
-}
 
-// ─── Signatory Card ───────────────────────────────────────────────────────────
-
-function SignatoryCard({ role, name }: { role: string; name: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg border bg-muted/20 px-3 py-2.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {role}
-      </span>
-      <span className="text-sm font-medium">{name}</span>
+      {/* ── Confirmations ── */}
+      <ConfirmDialog
+        open={confirm === "approve"}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title="Approve this contract?"
+        description="Approval unlocks milestone changes and completion for this contract. This cannot be undone from this page."
+        confirmLabel="Approve"
+        isPending={isApproving}
+        onConfirm={() => approveContract(contract.id, { onSuccess: () => setConfirm(null) })}
+      />
+      <ConfirmDialog
+        open={confirm === "advance"}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={nextMilestone ? `Move to ${STATUS_CONFIG[nextMilestone].label}?` : "Move to next milestone?"}
+        description="Milestones only move forward; you cannot go back to an earlier one."
+        confirmLabel="Move forward"
+        isPending={isUpdating}
+        onConfirm={() => nextMilestone && runStatusUpdate(nextMilestone)}
+      />
+      <ConfirmDialog
+        open={confirm === "archive"}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title="Archive this contract?"
+        description="Archived contracts cannot move to another milestone."
+        confirmLabel="Archive"
+        destructive
+        isPending={isUpdating}
+        onConfirm={() => runStatusUpdate("ARCHIVED")}
+      />
     </div>
   );
 }
