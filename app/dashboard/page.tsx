@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
@@ -71,7 +72,7 @@ export default function DashboardLandingPage() {
   const [showPendingTasks, setShowPendingTasks] = useState(false);
 
   const user = session?.user;
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(user?.role ?? "");
+  const { isAdmin } = useRole();
   const stats = dashboardData?.stats;
   const completionRate = stats?.completionRate ?? 0;
 

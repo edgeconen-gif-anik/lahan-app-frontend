@@ -1,8 +1,9 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
+import { useFiscalYearSelection } from "@/lib/fiscal-year-context";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -455,13 +456,10 @@ function ContractLandingContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
-  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const [fiscalYearFilter, setFiscalYearFilter] = useFiscalYearSelection();
   const effectiveFiscalYear =
     fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
   const { data: contracts = [], isLoading, isFetching, isError } = useContracts({

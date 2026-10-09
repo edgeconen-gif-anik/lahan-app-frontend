@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,7 @@ import type { FuelLogPayload } from "@/lib/schema/fuel/fuel";
 export default function EditFuelLogPage() {
   const params = useParams();
   const id = params.id as string;
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
   const { data: fuelLog, isLoading, isError } = useFuelLog(id);
   const { mutate: updateFuelLog, isPending } = useUpdateFuelLog();
 

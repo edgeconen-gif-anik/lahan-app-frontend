@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useFiscalYearSelection } from "@/lib/fiscal-year-context";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import {
   useAllUserCommittees,
   useApproveUserCommittee,
@@ -54,12 +55,9 @@ const getOfficialDetails = (officials: CommitteeOfficial[], role: string) => {
 };
 
 export default function CommitteeLandingPage() {
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
   const [search, setSearch] = useState("");
-  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const [fiscalYearFilter, setFiscalYearFilter] = useFiscalYearSelection();
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("ALL");
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();

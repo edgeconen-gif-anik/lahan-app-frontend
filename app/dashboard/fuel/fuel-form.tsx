@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { ArrowLeft, Fuel, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useContracts } from "@/hooks/contract/useContracts";
@@ -63,10 +63,7 @@ export function FuelForm({
   mode,
   onSubmit,
 }: FuelFormProps) {
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
   const [form, setForm] = useState<FuelFormValues>({
     userId: defaultFuelLog?.userId ?? "",
     projectId: defaultFuelLog?.projectId ?? "",

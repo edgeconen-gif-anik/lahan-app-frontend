@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -73,8 +73,8 @@ function buildCompletionDraft(contract: Contract, contractId: string): Completio
 export default function ContractUpdatePage() {
   const params = useParams();
   const router = useRouter();
-  const { data: session } = useSession();
   const contractId = params.id as string;
+  const { isAdmin } = useRole();
 
   const { data: contract, isLoading, error } = useContract(contractId);
   const {
@@ -147,9 +147,6 @@ export default function ContractUpdatePage() {
 
   const isArchived = contract.status === "ARCHIVED";
   const isCompleted = contract.status === "COMPLETED";
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
   const canEditCompletedContract = !isCompleted || isAdmin;
   const activeCompletionCode = completionCode ?? contract.completionCode ?? null;
 

@@ -1,32 +1,10 @@
 "use client";
 import Link from "next/link";
-import Image from "next/image"; // Import Image
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  FolderKanban,
-  FileSignature,
-  FileBarChart2,
-  Fuel,
-  Users,
-  UserCog,
-  Building2,
-  Settings,
-} from "lucide-react";
-
-const sidebarItems = [
-  { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
-  { icon: FolderKanban, label: "Projects", href: "/dashboard/projects" },
-  { icon: FileSignature, label: "Contracts", href: "/dashboard/contracts" },
-  { icon: Fuel, label: "Fuel Logs", href: "/dashboard/fuel" },
-  { icon: FileBarChart2, label: "Reports", href: "/dashboard/reports" },
-  { icon: Users, label: "Committees", href: "/dashboard/committees" },
-  { icon: Building2, label: "Companies", href: "/dashboard/companies" },
-  { icon: UserCog, label: "Users", href: "/dashboard/users", adminOnly: true },
-  { icon: Settings, label: "Setup", href: "/dashboard/setup", adminOnly: true },
-];
+import { useRole } from "@/lib/auth/use-role";
+import { NAV_GROUPS, OVERVIEW_ITEM, isNavItemActive } from "./navigation";
 
 type SidebarProps = React.HTMLAttributes<HTMLDivElement> & {
   /** Called after a nav link is clicked (e.g. to close the mobile drawer). */
@@ -35,74 +13,75 @@ type SidebarProps = React.HTMLAttributes<HTMLDivElement> & {
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
-  const visibleItems = isAdmin
-    ? sidebarItems
-    : sidebarItems.filter((item) => !item.adminOnly);
+  const { isAdmin } = useRole();
+
+  const groups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.adminOnly || isAdmin),
+  })).filter((group) => group.items.length > 0);
+
+  const renderLink = (item: typeof OVERVIEW_ITEM) => {
+    const isActive = isNavItemActive(pathname, item.href);
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onNavigate}
+        aria-current={isActive ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+          isActive
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        )}
+      >
+        <item.icon className="h-4 w-4" aria-hidden="true" />
+        {item.label}
+      </Link>
+    );
+  };
 
   return (
     <div
       className={cn(
-        "pb-12 h-full bg-sidebar text-sidebar-foreground border-r",
+        "flex h-full flex-col overflow-y-auto border-r bg-sidebar text-sidebar-foreground",
         className,
       )}
     >
-      <div className="space-y-4 py-4">
-        {/* LOGO SECTION */}
-        <div className="px-6 py-4 flex flex-col items-center border-b mb-4">
-          <div className="relative h-24 w-24 mb-3">
-            {/* Ensure logo.svg is in your public folder */}
-            <Image
-              src="/logo.svg"
-              alt="Lahan Municipality Logo"
-              fill
-              className="object-contain"
-              priority
-            />
-          </div>
-          <div className="text-center">
-            <h2 className="text-lg font-bold tracking-tight text-primary">
-              Lahan Municipality
-            </h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              PMS System
-            </p>
-          </div>
+      {/* Compact brand block */}
+      <div className="flex items-center gap-3 border-b px-4 py-4">
+        <div className="relative h-12 w-12 shrink-0">
+          <Image
+            src="/logo.svg"
+            alt="Lahan Municipality Logo"
+            fill
+            className="object-contain"
+            priority
+          />
         </div>
-
-        {/* NAVIGATION LINKS */}
-        <div className="px-3 py-2">
-          <div className="space-y-1">
-            {visibleItems.map((item) => {
-              const isActive =
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname.startsWith(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-bold leading-tight tracking-tight text-primary">
+            Lahan Municipality
+          </h2>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Project Management
+          </p>
         </div>
       </div>
+
+      <nav aria-label="Main" className="flex-1 space-y-5 px-3 py-4">
+        <div className="space-y-1">{renderLink(OVERVIEW_ITEM)}</div>
+
+        {groups.map((group) => (
+          <div key={group.label} className="space-y-1">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+              {group.label}
+            </p>
+            {group.items.map(renderLink)}
+          </div>
+        ))}
+      </nav>
     </div>
   );
 }

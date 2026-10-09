@@ -1,19 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { useVerifyCompanyOfficer } from "@/hooks/company/useCompany";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 export function CompanyOfficerVerification({ id, updatedAt }: { id: string; updatedAt: string }) {
-  const { data: session } = useSession();
   const mutation = useVerifyCompanyOfficer();
   const [name, setName] = useState("");
   const [designation, setDesignation] = useState("");
   const [evidence, setEvidence] = useState("");
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(session?.user?.role ?? "");
+  const { isAdmin } = useRole();
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 rounded-lg border bg-background p-6">

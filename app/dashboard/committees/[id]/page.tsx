@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import Link from "next/link";
 import {
   Card,
@@ -58,10 +58,7 @@ export default function CommitteeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
 
   const { data: committee, isLoading } = useUserCommittee(id);
   const { data: contracts = [], isLoading: isLoadingContracts } = useContracts({

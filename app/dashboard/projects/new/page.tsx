@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { ArrowLeft, FolderPlus } from "lucide-react";
 
 import { AdminRequired } from "@/components/admin-required";
@@ -12,10 +13,8 @@ import type { ProjectFormValues } from "@/lib/schema/project.schema";
 import { ProjectForm } from "@/shared/project-form";
 
 export default function NewProjectPage() {
-  const { data: session, status } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { status } = useSession();
+  const { isAdmin } = useRole();
   const { mutate: createProject, isPending } = useCreateProject();
 
   const handleSubmit = (values: ProjectFormValues) => {

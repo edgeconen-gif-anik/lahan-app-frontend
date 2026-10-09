@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useFiscalYearSelection } from "@/lib/fiscal-year-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -110,15 +111,12 @@ type DisplayProject = Project & {
 export default function ProjectLandingPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const [fiscalYearFilter, setFiscalYearFilter] = useFiscalYearSelection();
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortColumn>("sNo");

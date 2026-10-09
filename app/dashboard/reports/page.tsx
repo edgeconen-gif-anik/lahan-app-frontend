@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useFiscalYearSelection } from "@/lib/fiscal-year-context";
 import Link from "next/link";
 import {
   Building2,
@@ -404,7 +405,7 @@ function SummaryCard({
 export default function ReportsPage() {
   const [activeReport, setActiveReport] = useState<ReportKey>("companies");
   const [search, setSearch] = useState("");
-  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const [fiscalYearFilter, setFiscalYearFilter] = useFiscalYearSelection();
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
   const effectiveFiscalYear = fiscalYearFilter ?? setup?.currentFiscalYear ?? "";

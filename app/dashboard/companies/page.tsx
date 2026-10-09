@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useFiscalYearSelection } from "@/lib/fiscal-year-context";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import {
   useCompanies,
   useDeleteCompany,
@@ -73,13 +74,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function CompanyListPage() {
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
   const { data: setup } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
-  const [fiscalYearFilter, setFiscalYearFilter] = useState<string | null>(null);
+  const [fiscalYearFilter, setFiscalYearFilter] = useFiscalYearSelection();
   const effectiveFiscalYear =
     fiscalYearFilter ?? setup?.currentFiscalYear ?? "";
   const { data: companies = [], isLoading: isLoadingCompanies } = useCompanies({

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import {
   CalendarDays,
   Loader2,
@@ -29,10 +29,7 @@ import {
 const FISCAL_YEAR_PATTERN = /^\d{4}\s*[/-]\s*\d{2,3}$/;
 
 export default function SetupPage() {
-  const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
   const { data: setup, isLoading } = useSystemSetup();
   const { data: fiscalYears = [] } = useFiscalYears();
   const { mutate: updateSetup, isPending } = useUpdateSystemSetup();

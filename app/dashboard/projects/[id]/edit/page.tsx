@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { AlertCircle, ArrowLeft, FolderKanban } from "lucide-react";
 
 import { AdminRequired } from "@/components/admin-required";
@@ -17,10 +18,8 @@ export default function EditProjectPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { data: session, status } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { status } = useSession();
+  const { isAdmin } = useRole();
   const { data: project, isLoading, isError } = useProject(id);
   const { mutate: updateProject, isPending } = useUpdateProject();
 

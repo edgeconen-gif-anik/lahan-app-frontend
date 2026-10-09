@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import { useUserProfile } from "@/hooks/user/useUsers";
 import {
   ArrowLeft,
@@ -243,10 +244,8 @@ export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.id as string;
-  const { data: session, status } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { status } = useSession();
+  const { isAdmin } = useRole();
 
   const { data: profile, isLoading, isError } = useUserProfile(userId, {
     enabled: isAdmin,

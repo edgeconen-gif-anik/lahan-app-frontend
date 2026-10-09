@@ -34,11 +34,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { logoutFromApp } from "@/lib/auth/logout";
-import { useSystemSetup } from "@/hooks/setup/useSetup";
+import { CommandPalette } from "./command-palette";
+import { FiscalYearSwitcher } from "./fiscal-year-switcher";
+import { QuickCreateMenu } from "./quick-create-menu";
 
 export function Header() {
   const { data: session } = useSession();
-  const { data: setup } = useSystemSetup();
   const { theme = "system", setTheme } = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -47,7 +48,7 @@ export function Header() {
     : "U";
 
   return (
-    <header className="flex h-16 items-center border-b bg-background px-6">
+    <header className="flex h-16 items-center gap-2 border-b bg-background px-4 sm:px-6">
       {/* Mobile Menu Trigger */}
       <div className="mr-4 md:hidden">
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -66,12 +67,11 @@ export function Header() {
         </Sheet>
       </div>
 
-      <div className="flex flex-1 justify-end pr-3">
-        {setup?.currentFiscalYear ? (
-          <div className="hidden rounded-md border bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:block">
-            FY {setup.currentFiscalYear}
-          </div>
-        ) : null}
+      <CommandPalette />
+
+      <div className="flex flex-1 items-center justify-end gap-2 pr-3">
+        <FiscalYearSwitcher />
+        <QuickCreateMenu />
       </div>
 
       {/* User Profile Dropdown */}

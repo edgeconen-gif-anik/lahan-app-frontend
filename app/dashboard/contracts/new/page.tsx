@@ -3,6 +3,7 @@
 import React, { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useRole } from "@/lib/auth/use-role";
 import {
   AlertCircle,
   ArrowLeft,
@@ -1144,9 +1145,7 @@ function WorkOrderForm({
 export default function NewContractPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(
-    session?.user?.role ?? "",
-  );
+  const { isAdmin } = useRole();
   const { data: setup } = useSystemSetup();
   const { mutateAsync: createContract, isPending } = useCreateContract();
   const [formData, setFormData] = useState<ContractFormData>(INITIAL_FORM_DATA);

@@ -1,5 +1,6 @@
 import { Sidebar } from "@/shared/layout/sidebar";
-import { Header } from "@/shared/layout/header";  // Check path
+import { Header } from "@/shared/layout/header";
+import { DashboardBreadcrumbs } from "@/shared/layout/dashboard-breadcrumbs";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,6 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
         
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 print:block print:overflow-visible print:p-0">
+          <DashboardBreadcrumbs />
           {children}
         </main>
       </div>
