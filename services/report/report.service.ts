@@ -46,15 +46,19 @@ async function fetchAllProjects(params: ProjectQueryParams = {}) {
     return uniqueById(firstPage.data);
   }
 
-  const remainingPages = await Promise.all(
-    Array.from({ length: totalPages - 1 }, (_, index) =>
-      projectService.getAll({
-        ...params,
-        page: index + 2,
-        limit,
-      }) as Promise<ProjectResponse>,
-    ),
-  );
+  const remainingPages: ProjectResponse[] = [];
+  for (let startPage = 2; startPage <= totalPages; startPage += 5) {
+    const batch = await Promise.all(
+      Array.from({ length: Math.min(5, totalPages - startPage + 1) }, (_, index) =>
+        projectService.getAll({
+          ...params,
+          page: startPage + index,
+          limit,
+        }) as Promise<ProjectResponse>,
+      ),
+    );
+    remainingPages.push(...batch);
+  }
 
   return uniqueById([
     ...firstPage.data,
@@ -66,14 +70,10 @@ export const reportService = {
   getData: async ({ fiscalYear }: ReportDataParams = {}): Promise<ReportData> => {
     const scopedParams = { fiscalYear: fiscalYear || "all" };
 
-    const [companies, committeesResponse, contracts, projects] =
+    const [companies, committees, contracts, projects] =
       await Promise.all([
         companyService.getAll(scopedParams),
-        userCommitteeService.getAll({
-          ...scopedParams,
-          page: 1,
-          limit: 10000,
-        }),
+        userCommitteeService.getAllRegistered(scopedParams),
         contractService.getAll(scopedParams),
         fetchAllProjects({
           ...scopedParams,
@@ -84,7 +84,7 @@ export const reportService = {
 
     return {
       companies: uniqueById(companies),
-      committees: uniqueById(committeesResponse.data),
+      committees: uniqueById(committees),
       contracts: uniqueById(contracts),
       projects: uniqueById(projects),
     };

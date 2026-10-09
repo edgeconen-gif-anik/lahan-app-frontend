@@ -53,6 +53,7 @@ import {
   useUpdateContractStatus,
 } from "@/hooks/contract/useContracts";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { invalidateCompanyViews } from "@/lib/company-query-invalidation";
 import { useRole } from "@/lib/auth/use-role";
 import { toNepaliDate } from "@/lib/date-utils";
 import { useEffectiveFiscalYear } from "@/lib/fiscal-year-context";
@@ -225,9 +226,9 @@ function StatusCard({
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className={cn("mt-2 text-2xl font-bold", isActive && "text-primary")}>
+      <div className={cn("mt-2 text-2xl font-bold", isActive && "text-primary")}>
         {value ?? <Skeleton className="mt-1 h-7 w-10" />}
-      </p>
+      </div>
     </button>
   );
 }
@@ -438,7 +439,13 @@ function ContractLandingContent() {
     setIsDeleting(true);
     try {
       await contractService.delete(contractToDelete.id);
-      await queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.details() }),
+        queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumbers() }),
+        queryClient.invalidateQueries({ queryKey: ["projects"] }),
+        invalidateCompanyViews(queryClient),
+      ]);
       setContractToDelete(null);
       toast.success("Contract deleted");
     } catch (error) {

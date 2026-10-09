@@ -22,6 +22,7 @@ import type {
 } from "@/lib/schema/contract/contract";
 import { deriveProjectStatusFromContracts } from "@/lib/project-status";
 import { isApprovedStatus } from "@/lib/schema/approval";
+import { invalidateCompanyViews } from "@/lib/company-query-invalidation";
 import { CONTRACT_STATUS_LABEL } from "@/components/contract-status-badge";
 
 type ContractListParams = {
@@ -203,7 +204,6 @@ export const CONTRACT_KEYS = {
     [...CONTRACT_KEYS.nextNumbers(), projectId ?? null] as const,
 };
 
-const COMPANY_QUERY_KEY = ["companies"] as const;
 const PROJECT_QUERY_KEY = ["projects"] as const;
 const USER_QUERY_KEY = ["users"] as const;
 const USER_COMMITTEE_QUERY_KEY = ["userCommittees"] as const;
@@ -314,7 +314,7 @@ export const useCreateContract = () => {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
-        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        invalidateCompanyViews(queryClient),
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
@@ -383,7 +383,7 @@ export const useUpdateContract = () => {
           queryKey: CONTRACT_KEYS.detail(variables.id),
         }),
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
-        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        invalidateCompanyViews(queryClient),
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
@@ -428,7 +428,7 @@ export const useProjectUpdateContract = () => {
           queryKey: CONTRACT_KEYS.detail(variables.id),
         }),
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
-        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        invalidateCompanyViews(queryClient),
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
@@ -478,7 +478,7 @@ export const useBulkApproveContracts = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.details() }),
-        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        invalidateCompanyViews(queryClient),
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
       ]);
@@ -516,7 +516,7 @@ export const useUpdateContractStatus = () => {
           queryKey: CONTRACT_KEYS.detail(variables.id),
         }),
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
-        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        invalidateCompanyViews(queryClient),
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
@@ -538,7 +538,7 @@ export const useDeleteContract = () => {
     onSuccess: () => {
       toast.success("Contract deleted successfully!");
       queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() });
-      queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY });
+      invalidateCompanyViews(queryClient);
       queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.nextNumbers() });
       router.push("/dashboard/contracts");
     },
@@ -566,7 +566,7 @@ export const useApproveContract = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.lists() }),
         queryClient.invalidateQueries({ queryKey: CONTRACT_KEYS.details() }),
-        queryClient.invalidateQueries({ queryKey: COMPANY_QUERY_KEY }),
+        invalidateCompanyViews(queryClient),
         queryClient.invalidateQueries({ queryKey: PROJECT_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: USER_COMMITTEE_QUERY_KEY }),
       ]);

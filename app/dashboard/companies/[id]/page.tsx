@@ -420,7 +420,7 @@ function StatusRow({
 }: {
   description: string;
   label: string;
-  status: "verified" | "pending" | "active" | "none" | "ready" | "locked";
+  status: "verified" | "pending" | "contracted" | "none" | "ready" | "locked";
 }) {
   const statusMap = {
     verified: {
@@ -431,8 +431,8 @@ function StatusRow({
       label: "Pending",
       tone: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
     },
-    active: {
-      label: "Active",
+    contracted: {
+      label: "Contracted",
       tone: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300",
     },
     none: {
@@ -707,17 +707,21 @@ export default function CompanyViewPage() {
   }
 
   const contractCount = getCompanyContractCount(company, companyContracts.length);
-  const isContracted = getCompanyIsContracted(company, companyContracts.length);
+  const approvedContractCount = companyContracts.filter(
+    (contract) => isApprovedStatus(contract.approvalStatus)
+  ).length;
+  const isContracted = getCompanyIsContracted(company, approvedContractCount);
   const showCertificate = isApprovedStatus(company.approvalStatus);
   const uniqueProjectCount = Math.max(
     company._count?.projects ?? 0,
     new Set(companyContracts.map((contract) => contract.projectId)).size
   );
   const activeContracts = companyContracts.filter(
-    (contract) => !["COMPLETED", "ARCHIVED"].includes(contract.status)
+    (contract) => isApprovedStatus(contract.approvalStatus) &&
+      !["COMPLETED", "ARCHIVED"].includes(contract.status)
   ).length;
   const completedContracts = companyContracts.filter(
-    (contract) => contract.status === "COMPLETED"
+    (contract) => isApprovedStatus(contract.approvalStatus) && contract.status === "COMPLETED"
   ).length;
   const documentsReadyCount = companyContracts.filter(
     (contract) => contract.agreement && contract.workOrder
@@ -784,7 +788,7 @@ export default function CompanyViewPage() {
                     : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                 )}
               >
-                {isContracted ? "Contract engagement active" : "No active contract engagement"}
+                {isContracted ? "Contract engagement recorded" : "No approved contract engagement"}
               </Badge>
             </div>
 
@@ -1177,11 +1181,11 @@ export default function CompanyViewPage() {
                 <StatusRow
                   description={
                     isContracted
-                      ? "This company is already tied to live contract activity."
-                      : "No active contract engagement is currently linked."
+                      ? "This company has recorded contract engagement."
+                      : "No approved contract engagement is currently linked."
                   }
                   label="Contract engagement"
-                  status={isContracted ? "active" : "none"}
+                  status={isContracted ? "contracted" : "none"}
                 />
                 <StatusRow
                   description={

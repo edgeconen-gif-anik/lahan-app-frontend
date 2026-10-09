@@ -62,6 +62,9 @@ export interface Company
   officerVerifiedById?: string | null;
   officerVerificationNote?: string | null;
   isContracted: boolean;
+  /** Derived from approved linked contracts by the backend. */
+  hasApprovedContract?: boolean;
+  approvedContractCount?: number;
   panVerified: boolean;
   initiatedById?: string | null;
   initiatedBy?: RegistrationInitiator | null;
@@ -77,5 +80,6 @@ export const getCompanyContractCount = (
 
 export const getCompanyIsContracted = (
   company: Company,
-  derivedContractCount = 0,
-) => company.isContracted || getCompanyContractCount(company, derivedContractCount) > 0;
+  derivedApprovedContractCount = 0,
+) => company.isContracted || company.hasApprovedContract === true ||
+  (company.approvedContractCount ?? 0) > 0 || derivedApprovedContractCount > 0;

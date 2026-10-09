@@ -49,7 +49,7 @@ import { getApiErrorMessage } from "@/lib/api-error";
 import { useRole } from "@/lib/auth/use-role";
 import { useEffectiveFiscalYear } from "@/lib/fiscal-year-context";
 import { downloadCsv, downloadXlsx, type CsvRow } from "@/lib/report-export";
-import { CompanyCategoryEnum } from "@/lib/schema/company.schema";
+import { CompanyCategoryEnum, getCompanyIsContracted } from "@/lib/schema/company.schema";
 import { isApprovedStatus } from "@/lib/schema/approval";
 import { useUrlParams } from "@/lib/use-url-params";
 import { cn } from "@/lib/utils";
@@ -71,7 +71,7 @@ function toReportRows(companies: CompanyListItem[]): CsvRow[] {
     "Fiscal Year": company.fiscalYear,
     Category: company.category,
     Approval: company.approvalStatus,
-    Contracted: company.isContracted || company.hasApprovedContract ? "Yes" : "No",
+    Contracted: getCompanyIsContracted(company) ? "Yes" : "No",
     "Contact Person": company.contactPerson ?? "",
     Phone: company.phoneNumber ?? "",
     Email: company.email ?? "",
@@ -114,7 +114,7 @@ function ContractedBadge({ company }: { company: CompanyListItem }) {
     return <Badge variant="outline">{label}</Badge>;
   }
 
-  return company.isContracted || company.hasApprovedContract ? (
+  return getCompanyIsContracted(company) ? (
     <StatusBadge tone="success" compact>
       Contracted
     </StatusBadge>
@@ -294,12 +294,12 @@ function CompanyListContent() {
     {
       id: "status",
       header: "Status",
-      cell: (company) => (
-        <div className="flex flex-col items-start gap-1.5">
-          <ApprovalStatusBadge status={company.approvalStatus} />
-          <ContractedBadge company={company} />
-        </div>
-      ),
+      cell: (company) => <ApprovalStatusBadge status={company.approvalStatus} />,
+    },
+    {
+      id: "contracted",
+      header: "Contracted",
+      cell: (company) => <ContractedBadge company={company} />,
     },
     {
       id: "contact",
@@ -402,6 +402,27 @@ function CompanyListContent() {
           </>
         }
       />
+
+      <div className={cn("grid gap-4", isAdmin ? "md:grid-cols-4" : "md:grid-cols-3")}>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">Registered companies</p>
+          <p className="text-2xl font-bold">{counts?.total ?? "–"}</p>
+        </div>
+        {isAdmin ? (
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <p className="text-sm text-muted-foreground">Pending approval</p>
+            <p className="text-2xl font-bold text-amber-600">{counts?.pending ?? "–"}</p>
+          </div>
+        ) : null}
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">Contracted</p>
+          <p className="text-2xl font-bold text-green-600">{counts?.contracted ?? "–"}</p>
+        </div>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">Not contracted</p>
+          <p className="text-2xl font-bold text-orange-600">{counts?.nonContracted ?? "–"}</p>
+        </div>
+      </div>
 
       <FilterChips
         label="Quick views"

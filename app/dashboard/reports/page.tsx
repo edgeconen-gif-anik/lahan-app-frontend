@@ -36,7 +36,7 @@ import { useReportData } from "@/hooks/report/useReports";
 import { useFiscalYears, useSystemSetup } from "@/hooks/setup/useSetup";
 import { downloadCsv } from "@/lib/report-export";
 import type { Project } from "@/lib/schema";
-import type { Company } from "@/lib/schema/company.schema";
+import { getCompanyIsContracted, type Company } from "@/lib/schema/company.schema";
 import type { Contract, ContractStatus } from "@/lib/schema/contract/contract";
 import { toNepaliDate } from "@/lib/date-utils";
 import { deriveProjectStatusFromContracts } from "@/lib/project-status";
@@ -165,6 +165,7 @@ function buildCompanyRows(
   contracts: Contract[],
 ): ReportRow[] {
   const contractCountsByCompany = new Map<string, number>();
+  const approvedContractCountsByCompany = new Map<string, number>();
 
   contracts.forEach((contract) => {
     if (!contract.companyId) return;
@@ -173,6 +174,12 @@ function buildCompanyRows(
       contract.companyId,
       (contractCountsByCompany.get(contract.companyId) ?? 0) + 1,
     );
+    if (contract.approvalStatus === "APPROVED") {
+      approvedContractCountsByCompany.set(
+        contract.companyId,
+        (approvedContractCountsByCompany.get(contract.companyId) ?? 0) + 1,
+      );
+    }
   });
 
   return companies.map((company, index) => {
@@ -194,7 +201,7 @@ function buildCompanyRows(
         registrationRequestDate: formatDate(company.registrationRequestDate),
         registrationDate: formatDate(company.registrationDate),
         approvalStatus: text(company.approvalStatus),
-        contracted: yesNo(company.isContracted || contractCount > 0),
+        contracted: yesNo(getCompanyIsContracted(company, approvedContractCountsByCompany.get(company.id) ?? 0)),
         contractCount,
         voucherNo: text(company.voucherNo),
         remarks: text(company.remarks),

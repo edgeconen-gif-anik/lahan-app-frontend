@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { companyService } from "@/services/company/company.service";
 import { Company } from "@/lib/schema/company.schema";
+import { invalidateCompanyViews } from "@/lib/company-query-invalidation";
 
 type MutationError = {
   response?: {
@@ -59,7 +60,7 @@ export const useVerifyCompanyOfficer = () => {
     mutationFn: companyService.verifyOfficer,
     onSuccess: () => {
       toast.success("Historical officer verified and saved");
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      invalidateCompanyViews(queryClient);
     },
     onError: (error: unknown) => toast.error(getErrorMessage(error, "Failed to verify officer")),
   });
@@ -77,7 +78,7 @@ export const useCreateCompany = () => {
           ? "Company registered successfully"
           : "Company submitted for admin approval"
       );
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      invalidateCompanyViews(queryClient);
       router.push("/dashboard/companies");
     },
     onError: (error: unknown) => {
@@ -98,7 +99,9 @@ export const useUpdateCompany = () => {
           ? "Company details updated"
           : "Company changes submitted for admin approval"
       );
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      invalidateCompanyViews(queryClient);
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       router.push("/dashboard/companies");
     },
     onError: (error: unknown) => {
@@ -114,7 +117,7 @@ export const useApproveCompany = () => {
     mutationFn: companyService.approve,
     onSuccess: () => {
       toast.success("Company approved");
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      invalidateCompanyViews(queryClient);
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to approve company"));
@@ -145,7 +148,7 @@ export const useBulkApproveCompanies = () => {
       } else {
         toast.warning(`${approved} approved, ${failed} could not be approved`);
       }
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      invalidateCompanyViews(queryClient);
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to approve companies"));
@@ -160,7 +163,7 @@ export const useDeleteCompany = () => {
     mutationFn: companyService.delete,
     onSuccess: () => {
       toast.success("Company deleted");
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      invalidateCompanyViews(queryClient);
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, "Failed to delete company"));

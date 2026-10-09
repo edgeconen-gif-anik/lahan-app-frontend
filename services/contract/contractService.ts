@@ -1,4 +1,5 @@
 import api from "@/lib/api";
+import { legacyContractPage } from "@/lib/legacy-list-pages";
 import type { PagedResult, SortOrder } from "@/lib/paged";
 import {
   Contract,
@@ -47,19 +48,19 @@ export type ContractCounts = {
 export const contractService = {
   /** Every matching contract as a plain array (also used for exports). */
   getAll: async (params?: ContractFilterParams): Promise<Contract[]> => {
-    const { data } = await api.get<Contract[]>("/contracts", { params });
-    return data;
+    const { data } = await api.get<Contract[] | PagedResult<Contract, ContractCounts>>("/contracts", { params });
+    return Array.isArray(data) ? data : data.data;
   },
 
   /** One page of contracts plus per-milestone counts. */
   getPage: async (
     params: ContractPageParams,
   ): Promise<PagedResult<Contract, ContractCounts>> => {
-    const { data } = await api.get<PagedResult<Contract, ContractCounts>>(
+    const { data } = await api.get<Contract[] | PagedResult<Contract, ContractCounts>>(
       "/contracts",
       { params },
     );
-    return data;
+    return Array.isArray(data) ? legacyContractPage(data, params) : data;
   },
 
   getOne: async (id: string): Promise<Contract> => {

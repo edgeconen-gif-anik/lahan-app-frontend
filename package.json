@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:company-contract-state": "node --test tests/company-contract-state.test.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
