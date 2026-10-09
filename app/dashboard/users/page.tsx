@@ -190,7 +190,7 @@ export default function UsersPage() {
 
   if (!isAdmin) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-4 rounded-md">
           <AlertCircle size={18} />
           Only admins can view the users dashboard.

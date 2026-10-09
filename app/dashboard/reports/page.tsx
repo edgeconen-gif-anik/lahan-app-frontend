@@ -568,7 +568,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <style jsx global>{`
         @media print {
           aside,

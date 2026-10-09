@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
+import { ProjectStatusBadge } from "@/components/status-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,13 +63,6 @@ function getInitials(name?: string | null) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
-}
-
-function getStatusClasses(status?: string) {
-  if (status === "COMPLETED") return "bg-emerald-100 text-emerald-700";
-  if (status === "ONGOING") return "bg-sky-100 text-sky-700";
-  if (status === "ARCHIVED") return "bg-zinc-100 text-zinc-700";
-  return "bg-amber-100 text-amber-700";
 }
 
 export default function DashboardLandingPage() {
@@ -387,12 +381,7 @@ export default function DashboardLandingPage() {
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium leading-5">{project.name}</p>
-                        <Badge
-                          variant="secondary"
-                          className={getStatusClasses(project.status)}
-                        >
-                          {formatLabel(project.status)}
-                        </Badge>
+                        <ProjectStatusBadge status={project.status} />
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {project.sNo ? `S.No ${project.sNo} · ` : ""}
@@ -520,12 +509,7 @@ export default function DashboardLandingPage() {
                           {project.fiscalYear}
                         </p>
                       </div>
-                      <Badge
-                        variant="secondary"
-                        className={getStatusClasses(project.status)}
-                      >
-                        {formatLabel(project.status)}
-                      </Badge>
+                      <ProjectStatusBadge status={project.status} />
                     </div>
                     <p className="text-sm font-semibold">
                       {formatMoney(project.allocatedBudget)}

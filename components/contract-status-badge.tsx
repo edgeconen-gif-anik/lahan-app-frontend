@@ -1,6 +1,10 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  CONTRACT_STATUS_DEFINITION,
+  StatusBadge,
+} from "@/components/status-badge";
 import type { ContractStatus } from "@/lib/schema/contract/contract";
 
 export const CONTRACT_STATUS_ORDER: ContractStatus[] = [
@@ -21,15 +25,6 @@ export const CONTRACT_STATUS_LABEL: Record<ContractStatus, string> = {
   ARCHIVED: "Archived",
 };
 
-const CONTRACT_STATUS_CLASSNAME: Record<ContractStatus, string> = {
-  NOT_STARTED: "bg-slate-100 text-slate-700 hover:bg-slate-100",
-  AGREEMENT: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  WORKORDER: "bg-violet-100 text-violet-700 hover:bg-violet-100",
-  WORKINPROGRESS: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-  COMPLETED: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
-  ARCHIVED: "bg-zinc-100 text-zinc-700 hover:bg-zinc-100",
-};
-
 export function ContractStatusBadge({
   status,
   compact = false,
@@ -41,13 +36,11 @@ export function ContractStatusBadge({
     return <Badge variant="outline">Unknown</Badge>;
   }
 
+  const definition = CONTRACT_STATUS_DEFINITION[status];
+
   return (
-    <Badge
-      className={`${CONTRACT_STATUS_CLASSNAME[status]} ${
-        compact ? "px-2 py-0 text-[11px]" : ""
-      }`}
-    >
+    <StatusBadge tone={definition.tone} icon={definition.icon} compact={compact}>
       {CONTRACT_STATUS_LABEL[status]}
-    </Badge>
+    </StatusBadge>
   );
 }

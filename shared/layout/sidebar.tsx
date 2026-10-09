@@ -46,7 +46,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
   return (
     <div
       className={cn(
-        "pb-12 h-full bg-slate-50 dark:bg-slate-950 border-r",
+        "pb-12 h-full bg-sidebar text-sidebar-foreground border-r",
         className,
       )}
     >
@@ -92,7 +92,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-muted-foreground hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-foreground",
+                      : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   )}
                 >
                   <item.icon className="h-4 w-4" />

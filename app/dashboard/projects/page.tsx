@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Eye,
   FileUp,
+  FolderKanban,
   Filter,
   Pencil,
   Plus,
@@ -23,6 +24,9 @@ import {
   X,
 } from "lucide-react";
 
+import { EmptyState } from "@/components/empty-state";
+import { ProjectStatusBadge } from "@/components/status-badge";
+import { TableSkeleton } from "@/components/table-skeleton";
 import { useContracts } from "@/hooks/contract/useContracts";
 import { useProjects } from "@/hooks/project/useProjects";
 import { Project } from "@/lib/schema";
@@ -239,22 +243,6 @@ export default function ProjectLandingPage() {
     );
   };
 
-  const getStatusClasses = (status: ProjectStatus) => {
-    if (status === "COMPLETED") {
-      return "bg-green-100 text-green-700";
-    }
-
-    if (status === "ONGOING") {
-      return "bg-blue-100 text-blue-700";
-    }
-
-    if (status === "ARCHIVED") {
-      return "bg-zinc-100 text-zinc-700";
-    }
-
-    return "bg-gray-100 text-gray-700";
-  };
-
   const contractsByProjectId = new Map<string, typeof contracts>();
   for (const contract of contracts) {
     const relatedContracts = contractsByProjectId.get(contract.projectId) ?? [];
@@ -288,7 +276,7 @@ export default function ProjectLandingPage() {
   ).length;
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold">Projects</h1>
         {isAdmin ? (
@@ -497,15 +485,17 @@ export default function ProjectLandingPage() {
       <div className="border rounded-lg overflow-hidden bg-card flex flex-col">
         <div className="md:hidden divide-y">
           {isLoading ? (
-            <p className="p-8 text-center text-muted-foreground">
-              Loading projects...
-            </p>
+            <TableSkeleton rows={5} columns={2} />
           ) : displayedProjects.length === 0 ? (
-            <p className="p-8 text-center text-muted-foreground">
-              {debouncedSearch
-                ? `No projects match "${debouncedSearch}". Try a different name or S.No.`
-                : "No projects found."}
-            </p>
+            <EmptyState
+              icon={FolderKanban}
+              title="No projects found"
+              description={
+                debouncedSearch
+                  ? `No projects match "${debouncedSearch}". Try a different name or S.No.`
+                  : "Try changing the fiscal year or status filter."
+              }
+            />
           ) : (
             displayedProjects.map((project) => (
               <div
@@ -525,13 +515,7 @@ export default function ProjectLandingPage() {
                       {highlightMatch(project.name, debouncedSearch)}
                     </p>
                   </div>
-                  <span
-                    className={`shrink-0 px-2 py-1 rounded-full text-xs font-bold ${getStatusClasses(
-                      project.displayStatus,
-                    )}`}
-                  >
-                    {project.displayStatus.replace(/_/g, " ")}
-                  </span>
+                  <ProjectStatusBadge status={project.displayStatus} />
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                   <dt className="text-muted-foreground">Budget Code</dt>
@@ -608,22 +592,22 @@ export default function ProjectLandingPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="p-10 text-center text-muted-foreground"
-                  >
-                    Loading projects...
+                  <td colSpan={7} className="p-0">
+                    <TableSkeleton rows={6} columns={6} />
                   </td>
                 </tr>
               ) : displayedProjects.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="p-10 text-center text-muted-foreground"
-                  >
-                    {debouncedSearch
-                      ? `No projects match "${debouncedSearch}". Try a different name or S.No.`
-                      : "No projects found."}
+                  <td colSpan={7}>
+                    <EmptyState
+                      icon={FolderKanban}
+                      title="No projects found"
+                      description={
+                        debouncedSearch
+                          ? `No projects match "${debouncedSearch}". Try a different name or S.No.`
+                          : "Try changing the fiscal year or status filter."
+                      }
+                    />
                   </td>
                 </tr>
               ) : (
@@ -662,13 +646,7 @@ export default function ProjectLandingPage() {
                       Rs. {Number(project.allocatedBudget ?? 0).toLocaleString()}
                     </td>
                     <td className="p-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-bold ${getStatusClasses(
-                          project.displayStatus,
-                        )}`}
-                      >
-                        {project.displayStatus.replace(/_/g, " ")}
-                      </span>
+                      <ProjectStatusBadge status={project.displayStatus} />
                     </td>
                     <td
                       className="p-4 text-right"

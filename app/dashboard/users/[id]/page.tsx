@@ -262,7 +262,7 @@ export default function UserProfilePage() {
 
   if (!isAdmin) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="space-y-4">
         <button onClick={() => router.back()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft size={16} /> Back
         </button>

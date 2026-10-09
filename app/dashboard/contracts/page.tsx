@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Download,
   Eye,
+  FileSignature,
   FileText,
   Plus,
   Search,
@@ -31,6 +32,10 @@ import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
+import { TableSkeleton } from "@/components/table-skeleton";
+import { Button } from "@/components/ui/button";
 import {
   ContractStatusBadge,
   CONTRACT_STATUS_LABEL,
@@ -434,7 +439,7 @@ function ContractRow({
 
 function ContractsLoadingFallback() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div>
         <div className="h-9 w-72 animate-pulse rounded-md bg-muted" />
         <div className="mt-2 h-5 w-[32rem] max-w-full animate-pulse rounded-md bg-muted" />
@@ -614,37 +619,28 @@ function ContractLandingContent() {
       />
 
       <div className="space-y-6 p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Contract Milestones
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage contract milestones in one place and keep project, company,
-              and user views in sync.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleDownloadReport}
-            disabled={isLoading || isFetching || isError || filteredContracts.length === 0}
-            title="Download contracts matching the selected fiscal year, search, implementor, and milestone"
-            className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Download Report (CSV)
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard/contracts/new")}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" />
-            New Contract
-          </button>
-          </div>
-        </div>
+        <PageHeader
+          title="Contracts"
+          description="Track every contract from agreement to completion, in sync with its project, company and committee."
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDownloadReport}
+                disabled={isLoading || isFetching || isError || filteredContracts.length === 0}
+                title="Download contracts matching the selected fiscal year, search, implementor, and milestone"
+              >
+                <Download />
+                Download Report (CSV)
+              </Button>
+              <Button type="button" onClick={() => router.push("/dashboard/contracts/new")}>
+                <Plus />
+                New Contract
+              </Button>
+            </>
+          }
+        />
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
           <StatusCard
@@ -758,20 +754,26 @@ function ContractLandingContent() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-10 text-center text-muted-foreground"
-                    >
-                      Loading contracts...
+                    <td colSpan={7} className="p-0">
+                      <TableSkeleton rows={6} columns={6} />
                     </td>
                   </tr>
                 ) : filteredContracts.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-10 text-center text-muted-foreground"
-                    >
-                      No contracts match the current filters.
+                    <td colSpan={7}>
+                      <EmptyState
+                        icon={FileSignature}
+                        title="No contracts found"
+                        description="Nothing matches the current filters. Try clearing the search or choosing another fiscal year."
+                        action={
+                          <Button asChild size="sm">
+                            <Link href="/dashboard/contracts/new">
+                              <Plus />
+                              New Contract
+                            </Link>
+                          </Button>
+                        }
+                      />
                     </td>
                   </tr>
                 ) : (

@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { ApprovalStatusBadge } from "@/components/approval-status-badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { EmptyState } from "@/components/empty-state";
+import { TableSkeleton } from "@/components/table-skeleton";
 import { Button } from "@/components/ui/button";
 import {
   FUEL_SOURCE_LABEL,
@@ -303,7 +305,7 @@ export default function FuelLogsPage() {
   const handleDelete = (fuelLog: FuelLog) => setFuelLogToDelete(fuelLog);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
@@ -433,20 +435,26 @@ export default function FuelLogsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-12 text-center text-muted-foreground"
-                  >
-                    Loading fuel logs...
+                  <td colSpan={6} className="p-0">
+                    <TableSkeleton rows={6} columns={6} />
                   </td>
                 </tr>
               ) : fuelLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
-                    <div className="mx-auto flex max-w-sm flex-col items-center gap-2 text-muted-foreground">
-                      <Droplets className="h-8 w-8" />
-                      <p>No fuel logs match the current filters.</p>
-                    </div>
+                  <td colSpan={6}>
+                    <EmptyState
+                      icon={Droplets}
+                      title="No fuel logs found"
+                      description="Nothing matches the current filters."
+                      action={
+                        <Button asChild size="sm">
+                          <Link href="/dashboard/fuel/new">
+                            <Plus />
+                            New Fuel Log
+                          </Link>
+                        </Button>
+                      }
+                    />
                   </td>
                 </tr>
               ) : (

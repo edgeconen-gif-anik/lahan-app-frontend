@@ -24,7 +24,7 @@ export default function NewProjectPage() {
 
   if (status === "loading") {
     return (
-      <div className="mx-auto max-w-5xl space-y-6 p-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         <Skeleton className="h-10 w-40" />
         <Skeleton className="h-64 w-full" />
         <Skeleton className="h-64 w-full" />

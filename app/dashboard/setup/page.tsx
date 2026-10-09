@@ -94,7 +94,7 @@ export default function SetupPage() {
 
   if (!isAdmin) {
     return (
-      <div className="mx-auto max-w-2xl p-6">
+      <div className="mx-auto max-w-2xl">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
